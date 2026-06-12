@@ -1,0 +1,6 @@
+{
+  "name": "Pairr.live",
+  "description": "Paid Audio & Video Calling Platform",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
