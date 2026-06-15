@@ -15,6 +15,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.example.ui.theme.appTopSafeArea
 import com.example.ui.screens.*
+import com.example.ui.screens.model.ModelCallEarningsScreen
 
 @Composable
 fun PairrApp(viewModel: MainViewModel) {
@@ -74,6 +75,12 @@ fun PairrApp(viewModel: MainViewModel) {
                 },
                 onUserClick = { userId ->
                     navController.navigate("user_detail/${Uri.encode(userId)}")
+                },
+                onRandomPeerCall = { userId ->
+                    navController.navigate("peer_call/${Uri.encode(userId)}")
+                },
+                onViewAllCallEarnings = {
+                    navController.navigate("model_call_earnings")
                 }
             )
         }
@@ -90,6 +97,15 @@ fun PairrApp(viewModel: MainViewModel) {
             TransactionsScreen(
                 viewModel = viewModel,
                 onBack = { navController.popBackStack() }
+            )
+        }
+        composable("model_call_earnings") {
+            ModelCallEarningsScreen(
+                viewModel = viewModel,
+                onBack = { navController.popBackStack() },
+                onUserClick = { userId ->
+                    navController.navigate("user_detail/${Uri.encode(userId)}")
+                }
             )
         }
         composable("packages/{initialFilter}") { backStackEntry ->
@@ -132,6 +148,14 @@ fun PairrApp(viewModel: MainViewModel) {
             CallScreen(
                 modelId = modelId,
                 isVideo = isVideo,
+                viewModel = viewModel,
+                onEndCall = { navController.popBackStack() }
+            )
+        }
+        composable("peer_call/{userId}") { backStackEntry ->
+            val userId = backStackEntry.arguments?.getString("userId")?.let { Uri.decode(it) }
+            PeerVideoCallScreen(
+                peerUserId = userId,
                 viewModel = viewModel,
                 onEndCall = { navController.popBackStack() }
             )

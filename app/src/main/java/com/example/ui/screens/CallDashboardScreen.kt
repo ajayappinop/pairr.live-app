@@ -44,7 +44,10 @@ import com.example.ui.theme.AppFilterChip
 import com.example.ui.theme.AppSegmentedTabs
 import com.example.ui.theme.OrangeSecondary
 import com.example.ui.theme.PinkPrimary
+import com.example.ui.theme.SoftScreenBackground
+import com.example.ui.theme.appErrorColor
 import com.example.ui.theme.appMutedText
+import com.example.ui.theme.appSuccessColor
 import com.example.ui.theme.appSurfaceCard
 import com.example.ui.theme.AppBorderWeight
 
@@ -60,10 +63,9 @@ fun CallDashboardScreen(viewModel: MainViewModel) {
     val borderColor = MaterialTheme.colorScheme.outline
     val textColor = MaterialTheme.colorScheme.onSurface
 
+    SoftScreenBackground {
     Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(bg)
+        modifier = Modifier.fillMaxSize()
     ) {
         // App Bar
         Row(
@@ -120,6 +122,7 @@ fun CallDashboardScreen(viewModel: MainViewModel) {
             }
         )
     }
+    }
 }
 
 @Composable
@@ -163,8 +166,7 @@ fun ScheduledCallsSection(viewModel: MainViewModel) {
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .background(cardBg, RoundedCornerShape(16.dp))
-                        .border(1.dp, borderColor, RoundedCornerShape(16.dp))
+                        .appSurfaceCard(shape = RoundedCornerShape(18.dp))
                         .padding(16.dp)
                 ) {
                     // Header: Avatar, Name, Status Badge
@@ -193,13 +195,13 @@ fun ScheduledCallsSection(viewModel: MainViewModel) {
                                 Icon(
                                     imageVector = if (booking.isVideo) Icons.Default.Videocam else Icons.Default.Call,
                                     contentDescription = "Call Type",
-                                    tint = if (booking.isVideo) Color(0xFFFF4D4D) else Color(0xFF3DDC84),
+                                    tint = if (booking.isVideo) appErrorColor() else appSuccessColor(),
                                     modifier = Modifier.size(14.dp)
                                 )
                                 Spacer(modifier = Modifier.width(4.dp))
                                 Text(
                                     text = if (booking.isVideo) "Video Co-host Call" else "Audio Voice Call",
-                                    color = textColor.copy(alpha = 0.5f),
+                                    color = appMutedText(),
                                     fontSize = 12.sp
                                 )
                             }
@@ -207,9 +209,15 @@ fun ScheduledCallsSection(viewModel: MainViewModel) {
 
                         // Status Badge
                         val statusColor = when (booking.status) {
-                            "Scheduled" -> Color(0xFF3DDC84)
-                            "Cancelled" -> Color(0xFFFF4D4D)
-                            else -> Color.Gray
+                            "Accepted" -> appSuccessColor()
+                            "Scheduled" -> OrangeSecondary
+                            "Cancelled" -> appErrorColor()
+                            else -> appMutedText()
+                        }
+                        val statusLabel = when (booking.status) {
+                            "Scheduled" -> "Awaiting model"
+                            "Accepted" -> "Confirmed"
+                            else -> booking.status
                         }
                         Box(
                             modifier = Modifier
@@ -219,7 +227,7 @@ fun ScheduledCallsSection(viewModel: MainViewModel) {
                                 .padding(horizontal = 10.dp, vertical = 4.dp)
                         ) {
                             Text(
-                                text = booking.status,
+                                text = statusLabel,
                                 color = statusColor,
                                 fontSize = 11.sp,
                                 fontWeight = FontWeight.Bold
@@ -249,7 +257,7 @@ fun ScheduledCallsSection(viewModel: MainViewModel) {
                             Spacer(modifier = Modifier.width(6.dp))
                             Text(
                                 text = booking.date,
-                                color = Color.LightGray,
+                                color = appMutedText(),
                                 fontSize = 13.sp,
                                 fontWeight = FontWeight.Medium
                             )
@@ -268,7 +276,7 @@ fun ScheduledCallsSection(viewModel: MainViewModel) {
                             Spacer(modifier = Modifier.width(6.dp))
                             Text(
                                 text = booking.timeSlot,
-                                color = Color.LightGray,
+                                color = appMutedText(),
                                 fontSize = 13.sp,
                                 fontWeight = FontWeight.Medium
                             )
@@ -278,7 +286,7 @@ fun ScheduledCallsSection(viewModel: MainViewModel) {
                     Spacer(modifier = Modifier.height(14.dp))
 
                     // Footer actions
-                    if (booking.status == "Scheduled") {
+                    if (booking.status == "Scheduled" || booking.status == "Accepted") {
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.End,
@@ -291,8 +299,8 @@ fun ScheduledCallsSection(viewModel: MainViewModel) {
                                     Toast.makeText(context, "Call booking cancelled successfully.", Toast.LENGTH_SHORT).show()
                                 },
                                 shape = RoundedCornerShape(10.dp),
-                                colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFFFF4D4D)),
-                                border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFFF4D4D).copy(alpha = 0.3f)),
+                                colors = ButtonDefaults.outlinedButtonColors(contentColor = appErrorColor()),
+                                border = androidx.compose.foundation.BorderStroke(1.dp, appErrorColor().copy(alpha = 0.3f)),
                                 modifier = Modifier.padding(end = 10.dp)
                             ) {
                                 Icon(Icons.Default.Delete, contentDescription = "Cancel", modifier = Modifier.size(14.dp))
@@ -315,7 +323,7 @@ fun ScheduledCallsSection(viewModel: MainViewModel) {
                         // Cancelled state info text
                         Text(
                             text = "This booking was cancelled and your reservation has been released.",
-                            color = Color.Gray.copy(alpha = 0.7f),
+                            color = appMutedText(),
                             fontSize = 11.sp,
                             lineHeight = 15.sp
                         )
@@ -411,7 +419,7 @@ fun CallRequestCard(request: CallRequest, onAccept: () -> Unit) {
             Box(
                 modifier = Modifier
                     .size(40.dp)
-                    .background(Color(0xFF3DDC84), CircleShape)
+                    .background(appSuccessColor(), CircleShape)
                     .clickable { onAccept() },
                 contentAlignment = Alignment.Center
             ) {
@@ -618,7 +626,7 @@ fun CallHistoryCard(item: CallHistoryItem, onRateCall: () -> Unit) {
         "Outgoing" -> Icons.Default.CallMade
         else -> Icons.Default.CallMissed
     }
-    val callColor = if (item.type == "Missed") Color(0xFFFF416C) else Color(0xFF3DDC84)
+    val callColor = if (item.type == "Missed") appErrorColor() else appSuccessColor()
 
     Row(
         modifier = Modifier

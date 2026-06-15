@@ -31,7 +31,14 @@ import com.example.WalletTransaction
 import com.example.ui.theme.AppFilterChip
 import com.example.ui.theme.OrangeSecondary
 import com.example.ui.theme.PinkPrimary
+import com.example.ui.theme.SoftScreenBackground
+import com.example.ui.theme.appErrorColor
+import com.example.ui.theme.appErrorContainer
 import com.example.ui.theme.appMutedText
+import com.example.ui.theme.appSuccessColor
+import com.example.ui.theme.appSuccessContainer
+import com.example.ui.theme.appSurfaceCard
+import com.example.ui.theme.AppBorderWeight
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -98,8 +105,9 @@ fun TransactionsScreen(
                 )
             )
         },
-        containerColor = MaterialTheme.colorScheme.background
+        containerColor = Color.Transparent
     ) { paddingValues ->
+        SoftScreenBackground {
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -118,9 +126,7 @@ fun TransactionsScreen(
                 Box(
                     modifier = Modifier
                         .weight(1f)
-                        .clip(RoundedCornerShape(16.dp))
-                        .background(cardBg)
-                        .border(1.dp, borderColor, RoundedCornerShape(16.dp))
+                        .appSurfaceCard(shape = RoundedCornerShape(18.dp))
                         .padding(14.dp)
                 ) {
                     Column {
@@ -129,23 +135,23 @@ fun TransactionsScreen(
                                 modifier = Modifier
                                     .size(24.dp)
                                     .clip(CircleShape)
-                                    .background(Color(0xFF1B3D2F)),
+                                    .background(appSuccessContainer()),
                                 contentAlignment = Alignment.Center
                             ) {
                                 Icon(
                                     imageVector = Icons.Default.ArrowUpward,
                                     contentDescription = "Received",
-                                    tint = Color(0xFF3DDC84),
+                                    tint = appSuccessColor(),
                                     modifier = Modifier.size(14.dp)
                                 )
                             }
                             Spacer(modifier = Modifier.width(8.dp))
-                            Text("Total Recharged", color = textColor.copy(alpha = 0.5f), fontSize = 11.sp, fontWeight = FontWeight.Medium)
+                            Text("Total Recharged", color = appMutedText(), fontSize = 11.sp, fontWeight = FontWeight.Medium)
                         }
                         Spacer(modifier = Modifier.height(10.dp))
                         Text(
                             text = String.format("+%,d Tokens", totalRecharged),
-                            color = Color(0xFF3DDC84),
+                            color = appSuccessColor(),
                             fontSize = 16.sp,
                             fontWeight = FontWeight.Bold
                         )
@@ -156,9 +162,7 @@ fun TransactionsScreen(
                 Box(
                     modifier = Modifier
                         .weight(1f)
-                        .clip(RoundedCornerShape(16.dp))
-                        .background(cardBg)
-                        .border(1.dp, borderColor, RoundedCornerShape(16.dp))
+                        .appSurfaceCard(shape = RoundedCornerShape(18.dp))
                         .padding(14.dp)
                 ) {
                     Column {
@@ -167,23 +171,23 @@ fun TransactionsScreen(
                                 modifier = Modifier
                                     .size(24.dp)
                                     .clip(CircleShape)
-                                    .background(Color(0xFF3D1B24)),
+                                    .background(appErrorContainer()),
                                 contentAlignment = Alignment.Center
                             ) {
                                 Icon(
                                     imageVector = Icons.Default.ArrowDownward,
                                     contentDescription = "Spent",
-                                    tint = Color(0xFFFF4D4D),
+                                    tint = appErrorColor(),
                                     modifier = Modifier.size(14.dp)
                                 )
                             }
                             Spacer(modifier = Modifier.width(8.dp))
-                            Text("Total Spent", color = textColor.copy(alpha = 0.5f), fontSize = 11.sp, fontWeight = FontWeight.Medium)
+                            Text("Total Spent", color = appMutedText(), fontSize = 11.sp, fontWeight = FontWeight.Medium)
                         }
                         Spacer(modifier = Modifier.height(10.dp))
                         Text(
                             text = String.format("%,d Tokens", totalSpends),
-                            color = Color(0xFFFF4D4D),
+                            color = appErrorColor(),
                             fontSize = 16.sp,
                             fontWeight = FontWeight.Bold
                         )
@@ -202,7 +206,7 @@ fun TransactionsScreen(
                 Icon(
                     imageVector = Icons.Default.FilterList,
                     contentDescription = "Filter",
-                    tint = textColor.copy(alpha = 0.5f),
+                    tint = appMutedText(),
                     modifier = Modifier.size(18.dp)
                 )
                 
@@ -239,9 +243,7 @@ fun TransactionsScreen(
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .clip(RoundedCornerShape(18.dp))
-                                .background(cardBg)
-                                .border(1.dp, borderColor, RoundedCornerShape(18.dp))
+                                .appSurfaceCard(shape = RoundedCornerShape(18.dp))
                                 .clickable { showTxDetailsDialog = tx }
                                 .padding(16.dp),
                             horizontalArrangement = Arrangement.SpaceBetween,
@@ -252,13 +254,13 @@ fun TransactionsScreen(
                                     modifier = Modifier
                                         .size(40.dp)
                                         .clip(CircleShape)
-                                        .background(if (tx.isPositive) Color(0xFF1B3D2F) else Color(0xFF3D1B24)),
+                                        .background(if (tx.isPositive) appSuccessContainer() else appErrorContainer()),
                                     contentAlignment = Alignment.Center
                                 ) {
                                     Icon(
                                         imageVector = Icons.Default.MonetizationOn,
                                         contentDescription = "Token Tx",
-                                        tint = if (tx.isPositive) Color(0xFF3DDC84) else Color(0xFFFF4D4D),
+                                        tint = if (tx.isPositive) appSuccessColor() else appErrorColor(),
                                         modifier = Modifier.size(20.dp)
                                     )
                                 }
@@ -271,23 +273,24 @@ fun TransactionsScreen(
                                         fontWeight = FontWeight.SemiBold
                                     )
                                     Spacer(modifier = Modifier.height(4.dp))
-                                    Text(tx.date, color = textColor.copy(alpha = 0.5f), fontSize = 12.sp)
+                                    Text(tx.date, color = appMutedText(), fontSize = 12.sp)
                                 }
                             }
                             Column(horizontalAlignment = Alignment.End) {
                                 Text(
                                     text = tx.amount,
-                                    color = if (tx.isPositive) Color(0xFF3DDC84) else Color(0xFFFF4D4D),
+                                    color = if (tx.isPositive) appSuccessColor() else appErrorColor(),
                                     fontSize = 16.sp,
                                     fontWeight = FontWeight.Bold
                                 )
                                 Spacer(modifier = Modifier.height(4.dp))
-                                Text("Success", color = Color(0xFF3DDC84), fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                                Text("Success", color = appSuccessColor(), fontSize = 10.sp, fontWeight = FontWeight.Bold)
                             }
                         }
                     }
                 }
             }
+        }
         }
     }
 
@@ -306,7 +309,7 @@ fun TransactionsScreen(
                     }
                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                         Text("Status:", color = textColor.copy(alpha = 0.5f), fontSize = 14.sp)
-                        Text("COMPLETED", color = Color(0xFF3DDC84), fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                        Text("COMPLETED", color = appSuccessColor(), fontSize = 14.sp, fontWeight = FontWeight.Bold)
                     }
                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                         Text("Timestamp:", color = textColor.copy(alpha = 0.5f), fontSize = 14.sp)
@@ -316,7 +319,7 @@ fun TransactionsScreen(
                         Text("Amount Modified:", color = textColor.copy(alpha = 0.5f), fontSize = 14.sp)
                         Text(
                             text = tx.amount,
-                            color = if (tx.isPositive) Color(0xFF3DDC84) else Color(0xFFFF4D4D),
+                            color = if (tx.isPositive) appSuccessColor() else appErrorColor(),
                             fontSize = 14.sp,
                             fontWeight = FontWeight.Bold
                         )

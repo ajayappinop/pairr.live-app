@@ -34,6 +34,8 @@ import com.example.BlockedUser
 import com.example.MainViewModel
 import com.example.ui.theme.OrangeSecondary
 import com.example.ui.theme.PinkPrimary
+import com.example.ui.theme.SoftScreenBackground
+import com.example.ui.theme.appSuccessColor
 import com.example.ui.theme.appBorderColor
 import com.example.ui.theme.appCaptionText
 import com.example.ui.theme.appSecondaryText
@@ -59,10 +61,9 @@ fun SettingsSubScreenScaffold(
     val bg = MaterialTheme.colorScheme.background
     val textColor = MaterialTheme.colorScheme.onSurface
 
+    SoftScreenBackground {
     Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(bg)
+        modifier = Modifier.fillMaxSize()
     ) {
         Row(
             modifier = Modifier
@@ -84,6 +85,7 @@ fun SettingsSubScreenScaffold(
             content = content
         )
     }
+    }
 }
 
 @Composable
@@ -101,7 +103,7 @@ fun SuccessDialog(
         shape = RoundedCornerShape(20.dp),
         containerColor = cardBg,
         icon = {
-            Icon(Icons.Default.CheckCircle, contentDescription = null, tint = Color(0xFF3DDC84), modifier = Modifier.size(40.dp))
+            Icon(Icons.Default.CheckCircle, contentDescription = null, tint = appSuccessColor(), modifier = Modifier.size(40.dp))
         },
         title = {
             Text(title, color = textColor, fontWeight = FontWeight.Bold, fontSize = 18.sp)
@@ -133,7 +135,7 @@ fun BlockedUsersScreen(
 
     SettingsSubScreenScaffold(title = "Blocked Accounts", onBack = onBack) {
         Text(
-            "Blocked users and creators cannot message or call you. Unblock them here at any time.",
+            "Blocked users and models cannot message or call you. Unblock them here at any time.",
             color = appSecondaryText(),
             fontSize = 14.sp,
             lineHeight = 20.sp
@@ -144,9 +146,7 @@ fun BlockedUsersScreen(
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clip(RoundedCornerShape(20.dp))
-                    .background(cardBg)
-                    .border(1.dp, borderColor, RoundedCornerShape(20.dp))
+                    .appSurfaceCard(shape = RoundedCornerShape(20.dp))
                     .padding(32.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
@@ -202,8 +202,8 @@ fun FaqScreen(onBack: () -> Unit) {
         listOf(
             "How do I edit my profile?" to "Open the Profile tab, go to the Personal Info section, update your details, and tap Save Changes.",
             "How do tokens work?" to "Audio and video calls use separate token balances. Buy packs from the Token Store or your profile wallet section.",
-            "How do I start a chat?" to "Open a creator's profile and tap Chat, or go to the Chat tab to continue existing conversations.",
-            "How do I block someone?" to "Open a user's or creator's profile page and tap the block icon. Manage blocked accounts from Settings → Blocked Accounts.",
+            "How do I start a chat?" to "Open a model's profile and tap Chat, or go to the Chat tab to continue existing conversations.",
+            "How do I block someone?" to "Open a user's or model's profile page and tap the block icon. Manage blocked accounts from Settings → Blocked Accounts.",
             "How do referrals work?" to "Share your invite code from Settings. When a friend signs up with it, you both receive 100 bonus tokens.",
             "How do I report a problem?" to "Go to Settings → Report A Problem, pick a category, describe the issue, and submit. Our team will review it."
         )
@@ -228,9 +228,7 @@ fun FaqScreen(onBack: () -> Unit) {
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(bottom = 10.dp)
-                    .clip(RoundedCornerShape(16.dp))
-                    .background(cardBg)
-                    .border(1.dp, borderColor, RoundedCornerShape(16.dp))
+                    .appSurfaceCard(shape = RoundedCornerShape(16.dp))
                     .clickable { expanded[index] = !isOpen }
                     .padding(16.dp)
             ) {
@@ -254,7 +252,7 @@ fun FaqScreen(onBack: () -> Unit) {
                 }
                 if (isOpen) {
                     Spacer(modifier = Modifier.height(8.dp))
-                    Text(answer, color = secondaryText, fontSize = 13.sp, lineHeight = 20.sp)
+                    Text(answer, color = appSecondaryText(), fontSize = 13.sp, lineHeight = 20.sp)
                 }
             }
         }
@@ -269,7 +267,7 @@ fun TermsOfServiceScreen(onBack: () -> Unit) {
             "1. Acceptance of Terms" to "By using Pairr, you agree to these terms and our community guidelines. If you do not agree, please discontinue use of the app.",
             "2. User Accounts" to "You are responsible for maintaining the confidentiality of your login credentials and for all activity under your account.",
             "3. Tokens & Payments" to "Tokens are used for audio and video sessions. Purchases are final unless required by applicable law. Bonus tokens may expire.",
-            "4. Creator Conduct" to "Creators must provide accurate profile information, respect community standards, and honor published rates for calls.",
+            "4. Model Conduct" to "Models must provide accurate profile information, respect community standards, and honor published rates for calls.",
             "5. Privacy" to "We collect and use data as described in our privacy practices to operate chat, calls, payments, and safety features.",
             "6. Termination" to "We may suspend or terminate accounts that violate these terms. You may delete your account at any time from Settings."
         )

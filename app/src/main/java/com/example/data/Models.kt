@@ -32,9 +32,14 @@ fun AppModel.displayProfilePhotoUrl(): String =
 /** Image shown on user-facing cards when the model has no intro video. */
 fun AppModel.displayCardImageUrl(): String = displayProfilePhotoUrl()
 
+/** Public handle shown to users — never the model's real full name. */
+fun AppModel.publicUsername(): String =
+    username.takeIf { it.isNotBlank() } ?: "model_$id"
+
 data class AppModel(
     val id: String = "",
     val name: String = "",
+    val username: String = "",
     val isOnline: Boolean = false,
     val isFeatured: Boolean = false,
     val bio: String = "",
@@ -54,6 +59,7 @@ val mockModels = listOf(
     AppModel(
         id = "1",
         name = "Aisha Khan",
+        username = "alessia_beauty",
         isOnline = true,
         isFeatured = true,
         bio = "Friendly companion for casual talks. I love movies and music.",
@@ -70,6 +76,7 @@ val mockModels = listOf(
     AppModel(
         id = "2",
         name = "Priya Sharma",
+        username = "priya_sharma",
         isOnline = false,
         isFeatured = false,
         bio = "Here to listen to you and give you the best advice.",
@@ -86,6 +93,7 @@ val mockModels = listOf(
     AppModel(
         id = "3",
         name = "Riya Patel",
+        username = "riya_patel",
         isOnline = true,
         isFeatured = true,
         bio = "Let's talk about life, universe and everything.",
@@ -102,6 +110,7 @@ val mockModels = listOf(
     AppModel(
         id = "4",
         name = "Neha Singh",
+        username = "neha_singh",
         isOnline = true,
         isFeatured = false,
         bio = "Love to sing and discuss arts.",
@@ -174,6 +183,28 @@ data class Wallet(
     val audioBalance: Int = 750,
     val videoBalance: Int = 750
 )
+
+/** Compact label for top bars, e.g. 1500 → "1.5k". */
+fun Wallet.formattedBalanceCompact(): String = balance.formatTokenCountCompact()
+
+/** Full label for wallet cards, e.g. 1500 → "1,500". */
+fun Wallet.formattedBalanceFull(): String = String.format("%,d", balance)
+
+fun Int.formatTokenCountCompact(): String = when {
+    this >= 1_000_000 -> formatCompactDivisor(1_000_000.0, "M")
+    this >= 1_000 -> formatCompactDivisor(1_000.0, "k")
+    else -> toString()
+}
+
+private fun Int.formatCompactDivisor(divisor: Double, suffix: String): String {
+    val scaled = this / divisor
+    val rounded = (scaled * 10).toInt() / 10.0
+    return if (rounded == rounded.toLong().toDouble()) {
+        "${rounded.toLong()}$suffix"
+    } else {
+        String.format("%.1f$suffix", rounded)
+    }
+}
 
 data class UserProfile(
     val id: String,

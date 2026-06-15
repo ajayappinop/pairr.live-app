@@ -9,12 +9,14 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CallEnd
 import androidx.compose.material.icons.filled.Cameraswitch
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.MicOff
 import androidx.compose.material.icons.filled.MonetizationOn
+import androidx.compose.material.icons.filled.ReportProblem
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.StarBorder
 import androidx.compose.material3.*
@@ -33,8 +35,17 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
 import com.example.MainViewModel
-import com.example.ui.theme.PinkPrimary
+import com.example.ui.components.ReportDialog
+import com.example.ui.components.ReportType
 import com.example.ui.theme.OrangeSecondary
+import com.example.ui.theme.PinkPrimary
+import com.example.ui.theme.appAccentColor
+import com.example.ui.theme.appCaptionText
+import com.example.ui.theme.appMutedText
+import com.example.ui.theme.appOutlinedFieldColors
+import com.example.ui.theme.appSecondaryText
+import com.example.ui.theme.appStarColor
+import com.example.ui.theme.appSubtleFill
 import kotlinx.coroutines.delay
 
 @Composable
@@ -52,6 +63,7 @@ fun CallScreen(
     var isMuted by remember { mutableStateOf(false) }
     var isCameraOff by remember { mutableStateOf(false) }
     var showRatingPrompt by remember { mutableStateOf(false) }
+    var showReportDialog by remember { mutableStateOf(false) }
     
     val pinkGradient = Brush.horizontalGradient(listOf(PinkPrimary, OrangeSecondary))
     
@@ -74,6 +86,21 @@ fun CallScreen(
     val formattedTime = String.format("%02d:%02d", timeElapsed / 60, timeElapsed % 60)
 
     Box(modifier = Modifier.fillMaxSize().background(Color.Black)) {
+        if (!showRatingPrompt) {
+            IconButton(
+                onClick = { showReportDialog = true },
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(top = 48.dp, end = 8.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.ReportProblem,
+                    contentDescription = "Report Call",
+                    tint = Color.White.copy(alpha = 0.85f)
+                )
+            }
+        }
+
         if (isVideo) {
             AsyncImage(
                 model = "https://i.pravatar.cc/800?u=${model.id}",
@@ -248,6 +275,9 @@ fun CallScreen(
         }
 
         if (showRatingPrompt) {
+            val dialogBg = MaterialTheme.colorScheme.surface
+            val dialogText = MaterialTheme.colorScheme.onSurface
+            val fieldColors = appOutlinedFieldColors()
             AlertDialog(
                 onDismissRequest = onEndCall,
                 title = {
@@ -267,23 +297,27 @@ fun CallScreen(
                         Text(
                             "Rate your Session",
                             style = MaterialTheme.typography.titleLarge,
-                            color = Color.White,
+                            color = dialogText,
                             fontWeight = FontWeight.Bold
                         )
                         Text(
                             "with ${model.name}",
                             style = MaterialTheme.typography.bodyMedium,
-                            color = Color.LightGray
+                            color = appSecondaryText()
                         )
                     }
                 },
                 text = {
                     var ratingInput by remember { mutableStateOf(5) }
                     var feedbackText by remember { mutableStateOf("") }
-                    val scrollState = rememberScrollState()
+                    val verticalScroll = rememberScrollState()
+                    val horizontalScroll = rememberScrollState()
                     
                     Column(
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .heightIn(max = 360.dp)
+                            .verticalScroll(verticalScroll),
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
                         Spacer(modifier = Modifier.height(12.dp))
@@ -301,7 +335,7 @@ fun CallScreen(
                                     Icon(
                                         imageVector = if (star <= ratingInput) Icons.Default.Star else Icons.Default.StarBorder,
                                         contentDescription = "$star Stars",
-                                        tint = if (star <= ratingInput) Color(0xFFFFD700) else Color.Gray,
+                                        tint = if (star <= ratingInput) appStarColor() else appMutedText(),
                                         modifier = Modifier.size(32.dp)
                                     )
                                 }
@@ -315,7 +349,7 @@ fun CallScreen(
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .horizontalScroll(scrollState),
+                                .horizontalScroll(horizontalScroll),
                             horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
                             quickTags.forEach { tag ->
@@ -329,8 +363,8 @@ fun CallScreen(
                                         }
                                     },
                                     colors = ButtonDefaults.buttonColors(
-                                        containerColor = if (isSelected) Color(0xFFE91E63) else Color.DarkGray.copy(alpha = 0.5f),
-                                        contentColor = Color.White
+                                        containerColor = if (isSelected) appAccentColor() else appSubtleFill(),
+                                        contentColor = if (isSelected) Color.White else dialogText
                                     ),
                                     contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
                                     shape = RoundedCornerShape(12.dp)
@@ -348,15 +382,8 @@ fun CallScreen(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .height(90.dp),
-                            placeholder = { Text("Write an optional review...", color = Color.Gray, fontSize = 13.sp) },
-                            colors = OutlinedTextFieldDefaults.colors(
-                                focusedBorderColor = Color(0xFFE91E63),
-                                unfocusedBorderColor = Color.Gray,
-                                focusedTextColor = Color.White,
-                                unfocusedTextColor = Color.White,
-                                focusedContainerColor = Color(0xFF1E1C24),
-                                unfocusedContainerColor = Color(0xFF1E1C24)
-                            ),
+                            placeholder = { Text("Write an optional review...", color = appCaptionText(), fontSize = 13.sp) },
+                            colors = fieldColors,
                             shape = RoundedCornerShape(12.dp)
                         )
                         
@@ -370,7 +397,7 @@ fun CallScreen(
                                 onClick = onEndCall,
                                 modifier = Modifier.weight(1f),
                                 colors = ButtonDefaults.outlinedButtonColors(
-                                    contentColor = Color.LightGray
+                                    contentColor = appSecondaryText()
                                 ),
                                 shape = RoundedCornerShape(12.dp)
                             ) {
@@ -385,7 +412,7 @@ fun CallScreen(
                                 },
                                 modifier = Modifier.weight(1.5f),
                                 colors = ButtonDefaults.buttonColors(
-                                    containerColor = Color(0xFFE91E63)
+                                    containerColor = appAccentColor()
                                 ),
                                 shape = RoundedCornerShape(12.dp)
                             ) {
@@ -395,7 +422,16 @@ fun CallScreen(
                     }
                 },
                 confirmButton = {},
-                containerColor = Color(0xFF16151D)
+                containerColor = dialogBg
+            )
+        }
+
+        if (showReportDialog) {
+            ReportDialog(
+                reportedName = model.name,
+                reportType = ReportType.Call,
+                callIsVideo = isVideo,
+                onDismiss = { showReportDialog = false }
             )
         }
     }

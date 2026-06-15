@@ -37,6 +37,12 @@ data class BlockedUser(
     val blockedAt: String
 )
 
+data class RandomPeerMatch(
+    val userId: String,
+    val name: String,
+    val avatarUrl: String
+)
+
 data class CallBooking(
     val id: String,
     val modelId: String,
@@ -46,7 +52,10 @@ data class CallBooking(
     val date: String,
     val timeSlot: String,
     val cost: Int,
-    val status: String = "Scheduled" // "Scheduled", "Completed", "Cancelled"
+    val userId: String = "",
+    val userName: String = "",
+    val userAvatarUrl: String = "",
+    val status: String = "Scheduled" // "Scheduled", "Accepted", "Completed", "Cancelled"
 )
 
 data class ModelReview(
@@ -68,6 +77,14 @@ data class ModelCallEarning(
     val date: String,
     val amountEarned: Int,
     val status: String = "Completed"
+)
+
+data class AppNotification(
+    val id: String,
+    val title: String,
+    val message: String,
+    val time: String,
+    val isRead: Boolean = false
 )
 
 class MainViewModel : ViewModel() {
@@ -169,7 +186,167 @@ class MainViewModel : ViewModel() {
     )
     val modelEarnings: StateFlow<List<ModelCallEarning>> = _modelEarnings.asStateFlow()
 
+    private val _modelProfileUsername = MutableStateFlow("alessia_beauty")
+    val modelProfileUsername: StateFlow<String> = _modelProfileUsername.asStateFlow()
+
+    private val _modelProfileFullName = MutableStateFlow("Alessia K.")
+    val modelProfileFullName: StateFlow<String> = _modelProfileFullName.asStateFlow()
+
+    fun setModelProfileUsername(username: String) {
+        val trimmed = username.trim()
+        _modelProfileUsername.value = trimmed
+        updateCurrentModel { it.copy(username = trimmed) }
+    }
+
+    fun setModelProfileFullName(fullName: String) {
+        _modelProfileFullName.value = fullName.trim()
+    }
+
+    fun updateModelProfileIdentity(username: String, fullName: String) {
+        setModelProfileUsername(username)
+        setModelProfileFullName(fullName)
+    }
+
+    private val _notifications = MutableStateFlow(
+        listOf(
+            AppNotification(
+                id = "n1",
+                title = "Welcome Bonus 🎁",
+                message = "You received 250 bonus tokens on your first visit. Claim them from the Token Store!",
+                time = "Just now"
+            ),
+            AppNotification(
+                id = "n2",
+                title = "Aisha Khan is live",
+                message = "Your favorite model just went online. Start a chat or call now.",
+                time = "12 min ago"
+            ),
+            AppNotification(
+                id = "n3",
+                title = "New message",
+                message = "Riya Patel sent you a message: \"Are you free for a call later?\"",
+                time = "1 hour ago"
+            ),
+            AppNotification(
+                id = "n4",
+                title = "Video pack offer",
+                message = "Save up to 35% on premium video token packs — limited time only.",
+                time = "Yesterday",
+                isRead = true
+            )
+        )
+    )
+    val notifications: StateFlow<List<AppNotification>> = _notifications.asStateFlow()
+
+    private val _modelNotifications = MutableStateFlow(
+        listOf(
+            AppNotification(
+                id = "mn1",
+                title = "New call request 📞",
+                message = "Rahul Sharma requested a video call — 150 tokens/min.",
+                time = "2 min ago"
+            ),
+            AppNotification(
+                id = "mn2",
+                title = "Earnings credited 💰",
+                message = "You earned 300 tokens from your call with Rahul S.",
+                time = "15 min ago"
+            ),
+            AppNotification(
+                id = "mn3",
+                title = "New fan message",
+                message = "Amit P. sent you a message: \"Hey, are you available?\"",
+                time = "45 min ago"
+            ),
+            AppNotification(
+                id = "mn4",
+                title = "Profile featured ⭐",
+                message = "Your profile was highlighted in Recommended For You today.",
+                time = "Yesterday",
+                isRead = true
+            )
+        )
+    )
+    val modelNotifications: StateFlow<List<AppNotification>> = _modelNotifications.asStateFlow()
+
+    val unreadNotificationCount: Int
+        get() = _notifications.value.count { !it.isRead }
+
+    val unreadModelNotificationCount: Int
+        get() = _modelNotifications.value.count { !it.isRead }
+
+    fun markNotificationRead(notificationId: String) {
+        _notifications.update { list ->
+            list.map { if (it.id == notificationId) it.copy(isRead = true) else it }
+        }
+    }
+
+    fun markModelNotificationRead(notificationId: String) {
+        _modelNotifications.update { list ->
+            list.map { if (it.id == notificationId) it.copy(isRead = true) else it }
+        }
+    }
+
+    fun markAllNotificationsRead() {
+        _notifications.update { list -> list.map { it.copy(isRead = true) } }
+    }
+
+    fun markAllModelNotificationsRead() {
+        _modelNotifications.update { list -> list.map { it.copy(isRead = true) } }
+    }
+
+    fun dismissNotification(notificationId: String) {
+        _notifications.update { list -> list.filter { it.id != notificationId } }
+    }
+
+    fun dismissModelNotification(notificationId: String) {
+        _modelNotifications.update { list -> list.filter { it.id != notificationId } }
+    }
+
+    private fun pushModelNotification(title: String, message: String) {
+        val notification = AppNotification(
+            id = "mn_${System.currentTimeMillis()}",
+            title = title,
+            message = message,
+            time = "Just now"
+        )
+        _modelNotifications.update { listOf(notification) + it }
+    }
+
+    private fun pushUserNotification(title: String, message: String) {
+        val notification = AppNotification(
+            id = "n_${System.currentTimeMillis()}",
+            title = title,
+            message = message,
+            time = "Just now"
+        )
+        _notifications.update { listOf(notification) + it }
+    }
+
     fun getCurrentModelId(): String? = _linkedModelId.value
+
+    /** Picks a random regular user for peer video calls — never a model account. */
+    fun findRandomPeerUser(excludeUserIds: Set<String> = emptySet()): RandomPeerMatch? {
+        val currentUserId = _currentUserId.value
+        val blockedIds = _blockedUsers.value.map { it.id }.toSet()
+        val modelAccountIds = userModelLinks.keys + _userModes.value.filter { it.value }.keys
+
+        val peerPool = demoUserDisplayNames.keys.filter { userId ->
+            userId !in modelAccountIds &&
+                userId !in blockedIds &&
+                userId != currentUserId &&
+                userId !in excludeUserIds
+        }
+        if (peerPool.isEmpty()) return null
+
+        val pickedId = peerPool.random()
+        val profile = getUserProfile(pickedId)
+        return RandomPeerMatch(
+            userId = pickedId,
+            name = profile.name,
+            avatarUrl = profile.avatarUrl
+        )
+    }
 
     fun getReviewsForCurrentModel(): List<ModelReview> {
         val modelId = _linkedModelId.value ?: return emptyList()
@@ -245,22 +422,54 @@ class MainViewModel : ViewModel() {
             CallBooking(
                 id = "b1",
                 modelId = "1",
-                modelName = "Aisha Khan",
+                modelName = "alessia_beauty",
                 modelAvatarUrl = "https://api.dicebear.com/7.x/bottts/png?seed=1",
                 isVideo = true,
                 date = "Tomorrow, Jun 12",
                 timeSlot = "04:30 PM - 05:00 PM",
-                cost = 250
+                cost = 250,
+                userId = "rahul_sharma",
+                userName = "Rahul Sharma",
+                userAvatarUrl = "https://i.pravatar.cc/300?u=rahul_sharma"
+            ),
+            CallBooking(
+                id = "b3",
+                modelId = "1",
+                modelName = "alessia_beauty",
+                modelAvatarUrl = "https://api.dicebear.com/7.x/bottts/png?seed=1",
+                isVideo = false,
+                date = "Sat, Jun 13",
+                timeSlot = "11:30 AM - 12:00 PM",
+                cost = 180,
+                userId = "vikram_singh",
+                userName = "Vikram Singh",
+                userAvatarUrl = "https://i.pravatar.cc/300?u=vikram_singh"
+            ),
+            CallBooking(
+                id = "b4",
+                modelId = "1",
+                modelName = "alessia_beauty",
+                modelAvatarUrl = "https://api.dicebear.com/7.x/bottts/png?seed=1",
+                isVideo = true,
+                date = "Sun, Jun 14",
+                timeSlot = "02:00 PM - 02:30 PM",
+                cost = 300,
+                userId = "ananya_k",
+                userName = "Ananya K.",
+                userAvatarUrl = "https://i.pravatar.cc/300?u=ananya_k"
             ),
             CallBooking(
                 id = "b2",
                 modelId = "3",
-                modelName = "Riya Patel",
+                modelName = "riya_patel",
                 modelAvatarUrl = "https://api.dicebear.com/7.x/bottts/png?seed=3",
                 isVideo = false,
                 date = "Jun 14, 2026",
                 timeSlot = "11:00 AM - 11:30 AM",
-                cost = 150
+                cost = 150,
+                userId = "ajay@appinop.com",
+                userName = "Ajay Kumar",
+                userAvatarUrl = "https://i.pravatar.cc/300?u=ajay@appinop.com"
             )
         )
     )
@@ -276,11 +485,60 @@ class MainViewModel : ViewModel() {
     )
     val transactions: StateFlow<List<WalletTransaction>> = _transactions.asStateFlow()
 
-    fun scheduleCall(booking: CallBooking) {
-        _bookings.value = listOf(booking) + _bookings.value
-        val tokenType = if (booking.isVideo) "Video" else "Audio"
-        addTransaction("Scheduled Call - ${booking.modelName}", "Reserved with $tokenType", true)
+    fun scheduleCall(booking: CallBooking): Boolean {
+        val prepaid = deductTokens(
+            amount = booking.cost,
+            isVideo = booking.isVideo,
+            reason = "Scheduled Call - ${booking.modelName}"
+        )
+        if (!prepaid) return false
+
+        val userId = _currentUserId.value.orEmpty()
+        val enriched = if (userId.isNotBlank() && booking.userId.isBlank()) {
+            val profile = getUserProfile(userId)
+            booking.copy(
+                userId = userId,
+                userName = profile.name,
+                userAvatarUrl = profile.avatarUrl
+            )
+        } else {
+            booking
+        }
+        _bookings.value = listOf(enriched) + _bookings.value
+
+        val callType = if (enriched.isVideo) "video" else "audio"
+        val userLabel = enriched.userName.ifBlank { "A user" }
+        val timeLabel = enriched.timeSlot.substringBefore(" -").trim()
+        pushModelNotification(
+            title = "New scheduled call 📅",
+            message = "$userLabel scheduled a $callType session on ${enriched.date} at $timeLabel (${enriched.cost} tokens paid). Please accept."
+        )
+        return true
     }
+
+    fun acceptBooking(bookingId: String) {
+        val accepted = _bookings.value.find { it.id == bookingId && it.status == "Scheduled" } ?: return
+        _bookings.update { list ->
+            list.map { booking ->
+                if (booking.id == bookingId && booking.status == "Scheduled") {
+                    booking.copy(status = "Accepted")
+                } else {
+                    booking
+                }
+            }
+        }
+        val callType = if (accepted.isVideo) "video" else "audio"
+        val timeLabel = accepted.timeSlot.substringBefore(" -").trim()
+        pushUserNotification(
+            title = "Session confirmed ✅",
+            message = "${accepted.modelName} accepted your $callType session on ${accepted.date} at $timeLabel."
+        )
+    }
+
+    fun scheduledBookingsForModel(modelId: String): List<CallBooking> =
+        _bookings.value.filter {
+            it.modelId == modelId && (it.status == "Scheduled" || it.status == "Accepted")
+        }
 
     fun cancelBooking(bookingId: String) {
         val current = _bookings.value
@@ -293,8 +551,9 @@ class MainViewModel : ViewModel() {
         }
     }
 
-    fun deductTokens(amount: Int, isVideo: Boolean = false): Boolean {
+    fun deductTokens(amount: Int, isVideo: Boolean = false, reason: String? = null): Boolean {
         val wallet = _walletState.value
+        val txTitle = reason ?: if (isVideo) "Private Video Call deducted" else "Private Audio Call deducted"
         if (isVideo) {
             val current = wallet.videoBalance
             if (current >= amount) {
@@ -303,7 +562,7 @@ class MainViewModel : ViewModel() {
                     videoBalance = newVideo,
                     balance = wallet.audioBalance + newVideo
                 )
-                addTransaction("Private Video Call deducted", "-$amount Video Tokens", false)
+                addTransaction(txTitle, "-$amount Video Tokens", false)
                 return true
             }
         } else {
@@ -314,7 +573,7 @@ class MainViewModel : ViewModel() {
                     audioBalance = newAudio,
                     balance = newAudio + wallet.videoBalance
                 )
-                addTransaction("Private Audio Call deducted", "-$amount Audio Tokens", false)
+                addTransaction(txTitle, "-$amount Audio Tokens", false)
                 return true
             }
         }
@@ -643,22 +902,54 @@ class MainViewModel : ViewModel() {
             CallBooking(
                 id = "b1",
                 modelId = "1",
-                modelName = "Aisha Khan",
+                modelName = "alessia_beauty",
                 modelAvatarUrl = "https://api.dicebear.com/7.x/bottts/png?seed=1",
                 isVideo = true,
                 date = "Tomorrow, Jun 12",
                 timeSlot = "04:30 PM - 05:00 PM",
-                cost = 250
+                cost = 250,
+                userId = "rahul_sharma",
+                userName = "Rahul Sharma",
+                userAvatarUrl = "https://i.pravatar.cc/300?u=rahul_sharma"
+            ),
+            CallBooking(
+                id = "b3",
+                modelId = "1",
+                modelName = "alessia_beauty",
+                modelAvatarUrl = "https://api.dicebear.com/7.x/bottts/png?seed=1",
+                isVideo = false,
+                date = "Sat, Jun 13",
+                timeSlot = "11:30 AM - 12:00 PM",
+                cost = 180,
+                userId = "vikram_singh",
+                userName = "Vikram Singh",
+                userAvatarUrl = "https://i.pravatar.cc/300?u=vikram_singh"
+            ),
+            CallBooking(
+                id = "b4",
+                modelId = "1",
+                modelName = "alessia_beauty",
+                modelAvatarUrl = "https://api.dicebear.com/7.x/bottts/png?seed=1",
+                isVideo = true,
+                date = "Sun, Jun 14",
+                timeSlot = "02:00 PM - 02:30 PM",
+                cost = 300,
+                userId = "ananya_k",
+                userName = "Ananya K.",
+                userAvatarUrl = "https://i.pravatar.cc/300?u=ananya_k"
             ),
             CallBooking(
                 id = "b2",
                 modelId = "3",
-                modelName = "Riya Patel",
+                modelName = "riya_patel",
                 modelAvatarUrl = "https://api.dicebear.com/7.x/bottts/png?seed=3",
                 isVideo = false,
                 date = "Jun 14, 2026",
                 timeSlot = "11:00 AM - 11:30 AM",
-                cost = 150
+                cost = 150,
+                userId = "ajay@appinop.com",
+                userName = "Ajay Kumar",
+                userAvatarUrl = "https://i.pravatar.cc/300?u=ajay@appinop.com"
             )
         )
         _transactions.value = listOf(
@@ -966,7 +1257,7 @@ class MainViewModel : ViewModel() {
         val model = _models.value.find { it.id == modelId }
         val thread = ChatThread(
             id = threadId,
-            participantName = model?.name ?: "Creator",
+            participantName = model?.name ?: "Model",
             participantAvatarUrl = model?.displayImageUrls()?.firstOrNull() ?: "https://i.pravatar.cc/150?u=$modelId",
             lastMessage = "Start a conversation…",
             lastMessageTime = "",
@@ -976,7 +1267,7 @@ class MainViewModel : ViewModel() {
             userId = userId,
             modelId = modelId,
             userName = _userNames.value[userId] ?: "User",
-            modelName = model?.name ?: "Creator",
+            modelName = model?.name ?: "Model",
             userAvatarUrl = "https://i.pravatar.cc/150?u=$userId",
             modelAvatarUrl = model?.displayImageUrls()?.firstOrNull() ?: "https://i.pravatar.cc/150?u=$modelId"
         )
@@ -1211,7 +1502,7 @@ class MainViewModel : ViewModel() {
 
     private val userProfileDetailsByKey = mapOf(
         "john_doe_99" to UserProfileDetails(
-            bio = "Hey there! I love connecting with creators for meaningful conversations.",
+            bio = "Hey there! I love connecting with models for meaningful conversations.",
             age = 28,
             gender = "Male",
             location = "New York, USA",
@@ -1245,14 +1536,139 @@ class MainViewModel : ViewModel() {
             interests = listOf("Business", "Travel", "Fitness", "Photography"),
             memberSince = "Nov 2024",
             totalCalls = 24
+        ),
+        "rahul_sharma" to UserProfileDetails(
+            bio = "Love meaningful conversations and meeting new people on Pairr.",
+            age = 27,
+            gender = "Male",
+            location = "Bangalore, India",
+            interests = listOf("Cricket", "Movies", "Tech", "Food"),
+            memberSince = "Mar 2025",
+            totalCalls = 6
+        ),
+        "vikram_singh" to UserProfileDetails(
+            bio = "Entrepreneur looking for engaging chats after work.",
+            age = 31,
+            gender = "Male",
+            location = "Jaipur, India",
+            interests = listOf("Business", "Travel", "Fitness"),
+            memberSince = "Feb 2025",
+            totalCalls = 9
+        ),
+        "ananya_k" to UserProfileDetails(
+            bio = "Creative soul — always up for fun and friendly conversations.",
+            age = 24,
+            gender = "Female",
+            location = "Pune, India",
+            interests = listOf("Art", "Music", "Fashion", "Travel"),
+            memberSince = "Apr 2025",
+            totalCalls = 4
+        ),
+        "ramesh_k" to UserProfileDetails(
+            bio = "Regular Pairr user who enjoys audio and video calls.",
+            age = 30,
+            gender = "Male",
+            location = "Hyderabad, India",
+            interests = listOf("Gaming", "Music", "Sports"),
+            memberSince = "Jan 2025",
+            totalCalls = 11
+        ),
+        "amit_p" to UserProfileDetails(
+            bio = "Software engineer — happy to connect during evenings.",
+            age = 26,
+            gender = "Male",
+            location = "Chennai, India",
+            interests = listOf("Coding", "Gaming", "Movies"),
+            memberSince = "May 2025",
+            totalCalls = 3
+        ),
+        "sagar_k" to UserProfileDetails(
+            bio = "Fitness enthusiast who loves motivational chats.",
+            age = 28,
+            gender = "Male",
+            location = "Kolkata, India",
+            interests = listOf("Fitness", "Nutrition", "Travel"),
+            memberSince = "Dec 2024",
+            totalCalls = 7
+        ),
+        "karan_w" to UserProfileDetails(
+            bio = "Music lover and weekend traveler.",
+            age = 29,
+            gender = "Male",
+            location = "Chandigarh, India",
+            interests = listOf("Music", "Travel", "Photography"),
+            memberSince = "Oct 2024",
+            totalCalls = 15
         )
     )
+
+    private val demoUserDisplayNames = mapOf(
+        "rahul_sharma" to "Rahul Sharma",
+        "vikram_singh" to "Vikram Singh",
+        "ananya_k" to "Ananya K.",
+        "ramesh_k" to "Ramesh K.",
+        "amit_p" to "Amit P.",
+        "sagar_k" to "Sagar K.",
+        "karan_w" to "Karan W."
+    )
+
+    private val demoUserIdsByDisplayName = mapOf(
+        "Ramesh K." to "ramesh_k",
+        "Rahul Sharma" to "rahul_sharma",
+        "Rahul S." to "rahul_sharma",
+        "Vikram Singh" to "vikram_singh",
+        "Vikram D." to "vikram_singh",
+        "Ananya K." to "ananya_k",
+        "Amit P." to "amit_p",
+        "Sagar K." to "sagar_k",
+        "Karan W." to "karan_w",
+        "John Doe" to "john_doe_99",
+        "Ajay Kumar" to "ajay@appinop.com"
+    )
+
+    fun resolveUserIdByDisplayName(displayName: String): String {
+        val trimmed = displayName.trim()
+        if (trimmed.isBlank()) return ""
+
+        demoUserIdsByDisplayName[trimmed]?.let { return it }
+        demoUserIdsByDisplayName.entries
+            .firstOrNull { it.key.equals(trimmed, ignoreCase = true) }
+            ?.value
+            ?.let { return it }
+
+        _chatThreads.value
+            .firstOrNull { it.userName.equals(trimmed, ignoreCase = true) }
+            ?.userId
+            ?.takeIf { it.isNotBlank() }
+            ?.let { return it }
+
+        _userNames.value.entries
+            .firstOrNull { it.value.equals(trimmed, ignoreCase = true) }
+            ?.key
+            ?.let { return it }
+
+        val firstToken = trimmed.substringBefore(' ').lowercase()
+        _chatThreads.value
+            .firstOrNull { thread ->
+                thread.userName.isNotBlank() &&
+                    thread.userName.substringBefore(' ').equals(firstToken, ignoreCase = true)
+            }
+            ?.userId
+            ?.takeIf { it.isNotBlank() }
+            ?.let { return it }
+
+        return trimmed.lowercase()
+            .replace(Regex("[^a-z0-9]+"), "_")
+            .trim('_')
+            .ifBlank { "guest_user" }
+    }
 
     fun getUserProfile(userId: String): UserProfile {
         val thread = _chatThreads.value.find { userIdsMatch(it.userId, userId) }
         val canonicalId = thread?.userId?.takeIf { it.isNotBlank() } ?: userId
         val name = thread?.userName?.takeIf { it.isNotBlank() }
             ?: _userNames.value.entries.find { userIdsMatch(it.key, userId) }?.value
+            ?: demoUserDisplayNames.entries.find { userIdsMatch(it.key, userId) }?.value
             ?: canonicalId.substringBefore("@").replace("_", " ")
                 .split(" ").joinToString(" ") { word ->
                     word.replaceFirstChar { c -> c.uppercase() }
@@ -1262,7 +1678,7 @@ class MainViewModel : ViewModel() {
         val details = userProfileDetailsByKey.entries
             .find { userIdsMatch(it.key, userId) }?.value
             ?: UserProfileDetails(
-                bio = "Pairr member enjoying conversations with creators.",
+                bio = "Pairr member enjoying conversations with models.",
                 age = 25,
                 gender = "Prefer not to say",
                 location = "India",

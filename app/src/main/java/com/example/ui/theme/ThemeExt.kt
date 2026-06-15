@@ -7,12 +7,13 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextFieldColors
-import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -124,6 +125,45 @@ fun appSubtleFill(): Color {
         LightSurfaceVariant
     }
 }
+
+@Composable
+fun appSuccessColor(): Color =
+    if (isAppDarkTheme()) Color(0xFF3DDC84) else Color(0xFF2E7D32)
+
+@Composable
+fun appErrorColor(): Color =
+    if (isAppDarkTheme()) Color(0xFFFF4D4D) else Color(0xFFD32F2F)
+
+@Composable
+fun appSuccessContainer(): Color =
+    if (isAppDarkTheme()) Color(0xFF1B3D2F) else LightMintTint
+
+@Composable
+fun appErrorContainer(): Color =
+    if (isAppDarkTheme()) Color(0xFF3D1B24) else LightErrorContainer
+
+@Composable
+fun appAudioAccentColor(): Color = appSuccessColor()
+
+@Composable
+fun appVideoAccentColor(): Color = appErrorColor()
+
+@Composable
+fun appAudioAccentContainer(): Color = appSuccessContainer()
+
+@Composable
+fun appVideoAccentContainer(): Color = appErrorContainer()
+
+@Composable
+fun appStarColor(): Color = YellowTertiary
+
+@Composable
+fun appInsetSurface(): Color =
+    if (isAppDarkTheme()) DarkBorder.copy(alpha = 0.5f) else LightSurfaceVariant
+
+@Composable
+fun appInsetSurfaceBorder(): Color =
+    if (isAppDarkTheme()) DarkBorder else LightBorder
 
 @Composable
 fun AppSegmentedTabs(
@@ -263,6 +303,13 @@ fun appOutlinedFieldColors(): TextFieldColors {
         cursorColor = appAccentColor()
     )
 }
+
+/** Screen width below ~small phone (360dp) — tighter layouts, shorter copy. */
+@Composable
+fun isCompactWidth(): Boolean = LocalConfiguration.current.screenWidthDp < 360
+
+/** Extra bottom space so scroll content clears the main bottom navigation bar. */
+val AppBottomNavClearance = 110.dp
 
 @Composable
 fun Modifier.appInputSurface(shape: Shape = RoundedCornerShape(16.dp)): Modifier {

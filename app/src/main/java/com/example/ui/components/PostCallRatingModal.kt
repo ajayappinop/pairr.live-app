@@ -29,6 +29,7 @@ import com.example.ui.theme.appBorderColor
 import com.example.ui.theme.appMutedText
 import com.example.ui.theme.appOutlinedFieldColors
 import com.example.ui.theme.AppBorderWeight
+import com.example.ui.theme.appStarColor
 import com.example.ui.theme.isAppDarkTheme
 
 @Composable
@@ -102,7 +103,7 @@ fun PostCallRatingModal(
                         Icon(
                             imageVector = if (i <= rating) Icons.Default.Star else Icons.Default.StarOutline,
                             contentDescription = "Star $i",
-                            tint = if (i <= rating) Color(0xFFFFD700) else muted,
+                            tint = if (i <= rating) appStarColor() else muted,
                             modifier = Modifier
                                 .size(40.dp)
                                 .clickable { rating = i }

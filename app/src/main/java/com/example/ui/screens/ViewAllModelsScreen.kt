@@ -30,6 +30,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.MainViewModel
 import com.example.data.AppModel
+import com.example.data.publicUsername
 import com.example.ui.components.ModelCardMedia
 import com.example.ui.theme.OrangeSecondary
 import com.example.ui.theme.PinkPrimary
@@ -43,6 +44,9 @@ import com.example.ui.theme.appSoftShadow
 import com.example.ui.theme.appSurfaceCard
 import com.example.ui.theme.appTitleText
 import com.example.ui.theme.AppBorderWeight
+import com.example.ui.theme.appSuccessColor
+import com.example.ui.theme.appSuccessContainer
+import com.example.ui.theme.appStarColor
 import com.example.ui.theme.isAppDarkTheme
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -71,7 +75,7 @@ fun ViewAllModelsScreen(
         visibleModels
             .filter { model ->
                 val matchesSearch = searchQuery.isBlank() ||
-                    model.name.contains(searchQuery, ignoreCase = true) ||
+                    model.publicUsername().contains(searchQuery, ignoreCase = true) ||
                     model.categories.any { it.contains(searchQuery, ignoreCase = true) } ||
                     model.bio.contains(searchQuery, ignoreCase = true)
                 val matchesFilter = when (selectedFilter) {
@@ -101,7 +105,7 @@ fun ViewAllModelsScreen(
                 title = {
                     Column {
                         Text(
-                            "Browse Creators",
+                            "Browse Models",
                             color = textColor,
                             fontWeight = FontWeight.Bold,
                             fontSize = 18.sp
@@ -204,7 +208,7 @@ fun ViewAllModelsScreen(
                         ) {
                             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                                 Text(
-                                    "No creators found",
+                                    "No models found",
                                     color = textColor,
                                     fontSize = 18.sp,
                                     fontWeight = FontWeight.Bold
@@ -296,7 +300,7 @@ private fun ViewAllModelCard(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    model.name,
+                    model.publicUsername(),
                     color = appTitleText(),
                     fontSize = 17.sp,
                     fontWeight = FontWeight.Bold,
@@ -318,7 +322,7 @@ private fun ViewAllModelCard(
             }
 
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(Icons.Default.Star, contentDescription = null, tint = Color(0xFFFFD700), modifier = Modifier.size(14.dp))
+                Icon(Icons.Default.Star, contentDescription = null, tint = appStarColor(), modifier = Modifier.size(14.dp))
                 Spacer(modifier = Modifier.width(4.dp))
                 Text(
                     String.format("%.1f", model.rating),
@@ -364,8 +368,8 @@ private fun ViewAllModelCard(
                 RatePill(
                     icon = Icons.Default.Call,
                     label = "${model.audioPrice}/min",
-                    tint = Color(0xFF3DDC84),
-                    bg = Color(0xFF3DDC84).copy(alpha = 0.12f)
+                    tint = appSuccessColor(),
+                    bg = appSuccessContainer()
                 )
                 RatePill(
                     icon = Icons.Default.Videocam,

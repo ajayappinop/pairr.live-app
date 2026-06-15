@@ -30,7 +30,11 @@ import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import com.example.MainViewModel
 import com.example.R
+import com.example.data.publicUsername
+import com.example.data.formattedBalanceCompact
+import com.example.data.Wallet
 import com.example.ui.components.ModelCardMedia
+import com.example.ui.components.NotificationsSheet
 import com.example.ui.components.ModelStoryCircle
 import com.example.ui.theme.OrangeSecondary
 import com.example.ui.theme.PinkPrimary
@@ -38,6 +42,8 @@ import com.example.ui.theme.SoftScreenBackground
 import com.example.ui.theme.DarkPromoGradients
 import com.example.ui.theme.accentHorizontalGradient
 import com.example.ui.theme.appBorderColor
+import com.example.ui.theme.appSuccessColor
+import com.example.ui.theme.appStarColor
 import com.example.ui.theme.appCaptionText
 import com.example.ui.theme.appMutedText
 import com.example.ui.theme.appOutlinedFieldColors
@@ -47,6 +53,7 @@ import com.example.ui.theme.appSurfaceCard
 import com.example.ui.theme.appTitleText
 import com.example.ui.theme.AppBorderWeight
 import com.example.ui.theme.isAppDarkTheme
+import com.example.ui.theme.isCompactWidth
 import com.example.ui.theme.selectedChipBrush
 
 import androidx.compose.foundation.pager.HorizontalPager
@@ -54,7 +61,16 @@ import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.material.icons.filled.PlayCircle
 import androidx.compose.material.icons.filled.School
 import androidx.compose.material.icons.filled.LocalOffer
+import androidx.compose.material.icons.filled.Shuffle
+import androidx.compose.material.icons.filled.Videocam
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.text.style.TextAlign
+import android.widget.Toast
+import androidx.compose.ui.platform.LocalContext
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlinx.coroutines.delay
 
 @Composable
@@ -62,7 +78,8 @@ fun DashboardScreen(
     viewModel: MainViewModel,
     onModelClick: (String) -> Unit,
     onViewAll: () -> Unit,
-    onViewPackages: (String) -> Unit = {}
+    onViewPackages: (String) -> Unit = {},
+    onRandomPeerCall: (String) -> Unit = {}
 ) {
     val favorites by viewModel.favorites.collectAsState()
     val allModels by viewModel.models.collectAsState()
@@ -77,25 +94,44 @@ fun DashboardScreen(
             filtered = filtered.filter { it.categories.contains(selectedCategory) }
         }
         if (searchQuery.isNotEmpty()) {
-            filtered = filtered.filter { it.name.contains(searchQuery, ignoreCase = true) }
+            filtered = filtered.filter { it.publicUsername().contains(searchQuery, ignoreCase = true) }
         }
         filtered
     }
     
     var showTutorialDialog by remember { mutableStateOf(false) }
+    var showNotificationsSheet by remember { mutableStateOf(false) }
+    var showRandomMatching by remember { mutableStateOf(false) }
+    val context = LocalContext.current
+    val unreadNotificationCount by viewModel.notifications.collectAsState()
+    val unreadCount = unreadNotificationCount.count { !it.isRead }
+    val wallet by viewModel.walletState.collectAsStateWithLifecycle()
 
     SoftScreenBackground {
+        Box(modifier = Modifier.fillMaxSize()) {
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
             contentPadding = PaddingValues(bottom = 110.dp)
         ) {
             item {
-                TopBarSection(searchQuery = searchQuery, onSearchQueryChanged = { searchQuery = it })
+                TopBarSection(
+                    searchQuery = searchQuery,
+                    onSearchQueryChanged = { searchQuery = it },
+                    unreadNotificationCount = unreadCount,
+                    onNotificationsClick = { showNotificationsSheet = true },
+                    totalTokenBalance = wallet.formattedBalanceCompact()
+                )
 
                 Spacer(modifier = Modifier.height(4.dp))
                 HomePromoBannerCarousel(
                     onViewPackages = onViewPackages,
                     onShowTutorial = { showTutorialDialog = true }
+                )
+
+                Spacer(modifier = Modifier.height(12.dp))
+                RandomCallHighlightCard(
+                    onClick = { showRandomMatching = true },
+                    modifier = Modifier.padding(horizontal = 18.dp)
                 )
 
                 // Welcome Message
@@ -137,22 +173,52 @@ fun DashboardScreen(
                 Spacer(modifier = Modifier.height(20.dp))
             }
         }
+
+            if (showRandomMatching) {
+                RandomCallMatchingOverlay(
+                    viewModel = viewModel,
+                    onMatched = { peerUserId ->
+                        showRandomMatching = false
+                        onRandomPeerCall(peerUserId)
+                    },
+                    onDismiss = {
+                        showRandomMatching = false
+                        Toast.makeText(context, "No users available right now. Try again soon.", Toast.LENGTH_SHORT).show()
+                    }
+                )
+            }
+        }
     }
 
     if (showTutorialDialog) {
         HomeTutorialDialog(onDismiss = { showTutorialDialog = false })
     }
+
+    if (showNotificationsSheet) {
+        NotificationsSheet(
+            viewModel = viewModel,
+            onDismiss = { showNotificationsSheet = false }
+        )
+    }
+
 }
 
 @Composable
-fun TopBarSection(searchQuery: String, onSearchQueryChanged: (String) -> Unit) {
+fun TopBarSection(
+    searchQuery: String,
+    onSearchQueryChanged: (String) -> Unit,
+    unreadNotificationCount: Int = 0,
+    onNotificationsClick: () -> Unit = {},
+    totalTokenBalance: String = Wallet().formattedBalanceCompact()
+) {
     val textColor = appTitleText()
     val isLight = !isAppDarkTheme()
+    val compact = isCompactWidth()
     val searchShape = RoundedCornerShape(16.dp)
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 18.dp, vertical = 20.dp),
+            .padding(horizontal = if (compact) 12.dp else 18.dp, vertical = if (compact) 14.dp else 20.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween
     ) {
@@ -162,42 +228,52 @@ fun TopBarSection(searchQuery: String, onSearchQueryChanged: (String) -> Unit) {
             onValueChange = onSearchQueryChanged,
             modifier = Modifier
                 .weight(1f)
-                .height(50.dp)
+                .height(if (compact) 46.dp else 50.dp)
                 .appSoftShadow(searchShape, elevation = if (isLight) 6.dp else 2.dp),
-            placeholder = { Text("Search creators...", color = appCaptionText()) },
+            placeholder = { Text("Search models...", color = appCaptionText()) },
             leadingIcon = { Icon(Icons.Default.Search, contentDescription = "Search", tint = appMutedText()) },
             shape = searchShape,
             colors = appOutlinedFieldColors(),
             singleLine = true
         )
         
-        Spacer(modifier = Modifier.width(16.dp))
+        Spacer(modifier = Modifier.width(if (compact) 8.dp else 16.dp))
         
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(if (compact) 8.dp else 14.dp)) {
             // Coin status
             Row(
                 modifier = Modifier
                     .clip(RoundedCornerShape(12.dp))
                     .appSoftShadow(RoundedCornerShape(12.dp), elevation = if (isLight) 4.dp else 2.dp)
                     .background(accentHorizontalGradient())
-                    .padding(horizontal = 10.dp, vertical = 6.dp),
+                    .padding(horizontal = if (compact) 8.dp else 10.dp, vertical = if (compact) 5.dp else 6.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Icon(Icons.Default.MonetizationOn, contentDescription = "Tokens", tint = Color.White, modifier = Modifier.size(16.dp))
-                Spacer(modifier = Modifier.width(6.dp))
-                Text("2.4k", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                Icon(Icons.Default.MonetizationOn, contentDescription = "Tokens", tint = Color.White, modifier = Modifier.size(if (compact) 14.dp else 16.dp))
+                Spacer(modifier = Modifier.width(if (compact) 4.dp else 6.dp))
+                Text(
+                    totalTokenBalance,
+                    color = Color.White,
+                    fontSize = if (compact) 11.sp else 13.sp,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1
+                )
             }
 
             // Notification
-            Box {
-                Icon(Icons.Outlined.Notifications, contentDescription = "Notifications", tint = textColor, modifier = Modifier.size(26.dp))
-                Box(
-                    modifier = Modifier
-                        .size(10.dp)
-                        .background(PinkPrimary, CircleShape)
-                        .border(1.5.dp, MaterialTheme.colorScheme.background, CircleShape)
-                        .align(Alignment.TopEnd)
-                )
+            Box(
+                modifier = Modifier.clickable(onClick = onNotificationsClick)
+            ) {
+                Icon(Icons.Outlined.Notifications, contentDescription = "Notifications", tint = textColor, modifier = Modifier.size(if (compact) 22.dp else 26.dp))
+                if (unreadNotificationCount > 0) {
+                    Box(
+                        modifier = Modifier
+                            .size(10.dp)
+                            .background(PinkPrimary, CircleShape)
+                            .border(1.5.dp, MaterialTheme.colorScheme.background, CircleShape)
+                            .align(Alignment.TopEnd)
+                    )
+                }
             }
         }
     }
@@ -262,7 +338,7 @@ fun HomePromoBannerCarousel(
                 id = "tutorial",
                 badge = "GET STARTED",
                 title = "How Pairr Works",
-                subtitle = "Learn to browse creators, chat, and start audio or video calls in minutes.",
+                subtitle = "Learn to browse models, chat, and start audio or video calls in minutes.",
                 cta = "Watch Tutorial",
                 icon = Icons.Default.School,
                 gradient = DarkPromoGradients.tutorial,
@@ -486,9 +562,9 @@ fun HomeTutorialDialog(onDismiss: () -> Unit) {
         },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                TutorialStep(number = "1", title = "Browse Creators", body = "Explore live and recommended models from the home feed or View All.")
+                TutorialStep(number = "1", title = "Browse Models", body = "Explore live and recommended models from the home feed or View All.")
                 TutorialStep(number = "2", title = "Buy Tokens", body = "Purchase audio or video token packs from the Token Store to start calls.")
-                TutorialStep(number = "3", title = "Chat & Connect", body = "Message a creator first or jump straight into an audio/video call.")
+                TutorialStep(number = "3", title = "Chat & Connect", body = "Message a model first or jump straight into an audio/video call.")
                 TutorialStep(number = "4", title = "Manage Wallet", body = "Track your balance, transactions, and bonus offers from your profile.")
             }
         },
@@ -567,7 +643,7 @@ fun HeroBanner() {
             }
             Spacer(modifier = Modifier.height(8.dp))
             Text("Star of the Week: Alessia", color = Color.White, fontSize = 22.sp, fontWeight = FontWeight.Black)
-            Text("Join her live session for exclusive rewards", color = Color.LightGray, fontSize = 13.sp)
+            Text("Join her live session for exclusive rewards", color = Color.White.copy(alpha = 0.75f), fontSize = 13.sp)
         }
         
         // Join Button floating inside
@@ -621,7 +697,7 @@ fun SectionHeader(title: String, subtitle: String? = null, onViewAll: () -> Unit
 @Composable
 fun AvailabilityBadge(status: String, modifier: Modifier = Modifier) {
     val bgColor = when (status) {
-        "Online" -> Color(0xFF4CAF50)
+        "Online" -> appSuccessColor()
         "Busy" -> Color(0xFFF57C00)
         else -> MaterialTheme.colorScheme.surfaceVariant
     }
@@ -727,7 +803,7 @@ fun PeopleYouMayLikeSection(
                 }
                 
                 Column(modifier = Modifier.padding(14.dp)) {
-                    Text(model.name, color = appTitleText(), fontSize = 16.sp, fontWeight = FontWeight.Bold, maxLines = 1)
+                    Text(model.publicUsername(), color = appTitleText(), fontSize = 16.sp, fontWeight = FontWeight.Bold, maxLines = 1)
                     Text(
                         "${model.status} • ${model.categories.firstOrNull()}",
                         color = appCaptionText(),
@@ -818,13 +894,150 @@ fun PopularRoomsSection() {
                                     .size(28.dp)
                                     .offset(x = if (avatarIndex > 0) -(avatarIndex * 10).dp else 0.dp)
                                     .clip(CircleShape)
-                                    .border(1.5.dp, Color(0xFF2A2836), CircleShape),
+                                    .border(1.5.dp, appBorderColor(), CircleShape),
                                 contentScale = ContentScale.Crop
                             )
                         }
                     }
                 }
             }
+        }
+    }
+}
+
+@Composable
+fun RandomCallHighlightCard(
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val shape = RoundedCornerShape(20.dp)
+    val gradient = Brush.horizontalGradient(listOf(PinkPrimary, OrangeSecondary))
+
+    Box(
+        modifier = modifier
+            .fillMaxWidth()
+            .clip(shape)
+            .background(gradient)
+            .clickable(onClick = onClick)
+            .padding(2.dp)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(18.dp))
+                .background(MaterialTheme.colorScheme.surface)
+                .padding(horizontal = 16.dp, vertical = 14.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(52.dp)
+                    .clip(CircleShape)
+                    .background(gradient),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Shuffle,
+                    contentDescription = null,
+                    tint = Color.White,
+                    modifier = Modifier.size(26.dp)
+                )
+            }
+
+            Spacer(modifier = Modifier.width(14.dp))
+
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = "Random Call",
+                    color = appTitleText(),
+                    fontSize = 17.sp,
+                    fontWeight = FontWeight.Bold
+                )
+                Spacer(modifier = Modifier.height(2.dp))
+                Text(
+                    text = "Instant video chat with another user — not models",
+                    color = appSecondaryText(),
+                    fontSize = 12.sp,
+                    lineHeight = 16.sp
+                )
+            }
+
+            Icon(
+                imageVector = Icons.Default.Videocam,
+                contentDescription = null,
+                tint = PinkPrimary,
+                modifier = Modifier.size(28.dp)
+            )
+        }
+    }
+}
+
+@Composable
+fun RandomCallMatchingOverlay(
+    viewModel: MainViewModel,
+    onMatched: (String) -> Unit,
+    onDismiss: () -> Unit
+) {
+    var statusText by remember { mutableStateOf("Finding someone nearby...") }
+
+    LaunchedEffect(Unit) {
+        delay(1200)
+        statusText = "Matching you with a user..."
+        delay(900)
+        val match = viewModel.findRandomPeerUser()
+        if (match != null) {
+            statusText = "Connected with ${match.name}!"
+            delay(400)
+            onMatched(match.userId)
+        } else {
+            onDismiss()
+        }
+    }
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color.Black.copy(alpha = 0.88f)),
+        contentAlignment = Alignment.Center
+    ) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            modifier = Modifier.padding(32.dp)
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(88.dp)
+                    .clip(CircleShape)
+                    .background(PinkPrimary.copy(alpha = 0.15f)),
+                contentAlignment = Alignment.Center
+            ) {
+                CircularProgressIndicator(
+                    color = PinkPrimary,
+                    strokeWidth = 3.dp,
+                    modifier = Modifier.size(56.dp)
+                )
+            }
+            Spacer(modifier = Modifier.height(24.dp))
+            Text(
+                text = "Random Video Call",
+                color = Color.White,
+                fontSize = 22.sp,
+                fontWeight = FontWeight.Bold
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                text = statusText,
+                color = Color.White.copy(alpha = 0.7f),
+                fontSize = 14.sp,
+                textAlign = TextAlign.Center
+            )
+            Spacer(modifier = Modifier.height(6.dp))
+            Text(
+                text = "User-to-user only · Models are not included",
+                color = PinkPrimary.copy(alpha = 0.85f),
+                fontSize = 12.sp,
+                textAlign = TextAlign.Center
+            )
         }
     }
 }

@@ -126,7 +126,7 @@ class ChatRepository(private val firestore: FirebaseFirestore?) {
         val userId = getString("userId") ?: return null
         val modelId = getString("modelId") ?: return null
         val userName = getString("userName") ?: "User"
-        val modelName = getString("modelName") ?: "Creator"
+        val modelName = getString("modelName") ?: "Model"
         val userAvatarUrl = getString("userAvatarUrl") ?: "https://i.pravatar.cc/150?u=$userId"
         val modelAvatarUrl = getString("modelAvatarUrl") ?: "https://i.pravatar.cc/150?u=$modelId"
         val lastMessage = getString("lastMessage") ?: ""

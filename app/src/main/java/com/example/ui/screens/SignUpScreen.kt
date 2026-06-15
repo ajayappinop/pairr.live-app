@@ -41,11 +41,13 @@ import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import android.widget.Toast
-import androidx.compose.ui.platform.LocalContext
-import com.example.ui.theme.OrangeSecondary
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.platform.LocalContext
 import com.example.ui.theme.LightShadow
+import com.example.ui.theme.OrangeSecondary
 import com.example.ui.theme.PinkPrimary
+import com.example.ui.theme.SoftScreenBackground
+import com.example.ui.theme.isAppDarkTheme
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -88,17 +90,13 @@ fun SignUpScreen(
     val borderColor = MaterialTheme.colorScheme.outline
     val textColor = MaterialTheme.colorScheme.onSurface
     val secondaryTextColor = MaterialTheme.colorScheme.onSurfaceVariant
-    val isDarkTheme = MaterialTheme.colorScheme.background.luminance() < 0.5f
+    val isDarkTheme = isAppDarkTheme()
     
     val buttonGradient = Brush.horizontalGradient(
-        colors = listOf(PinkPrimary, OrangeSecondary)
+        colors = listOf(  PinkPrimary, OrangeSecondary)
     )
 
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(bg)
-    ) {
+    SoftScreenBackground {
         AuthBackgroundGlows(isDarkTheme = isDarkTheme)
 
         Column(
@@ -279,10 +277,11 @@ fun SignUpScreen(
                 },
                 modifier = Modifier.fillMaxWidth(),
                 placeholder = { Text("Phone Number") },
-                leadingIcon = { Icon(Icons.Outlined.Phone, contentDescription = "Email") },
+                leadingIcon = { Icon(Icons.Outlined.Phone, contentDescription = "Phone") },
                 shape = RoundedCornerShape(12.dp),
                 colors = textFieldColors,
                 singleLine = true,
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
                 isError = phoneError != null,
                 supportingText = { phoneError?.let { Text(it, color = MaterialTheme.colorScheme.error) } }
             )

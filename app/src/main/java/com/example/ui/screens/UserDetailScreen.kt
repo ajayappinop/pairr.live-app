@@ -18,6 +18,7 @@ import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Phone
+import androidx.compose.material.icons.filled.ReportProblem
 import androidx.compose.material.icons.filled.Videocam
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -35,8 +36,15 @@ import coil.compose.AsyncImage
 import com.example.MainViewModel
 import com.example.data.UserProfile
 import com.example.ui.components.FullScreenImageDialog
+import com.example.ui.components.BlockUserDialog
+import com.example.ui.components.ReportDialog
+import com.example.ui.components.ReportType
 import com.example.ui.theme.OrangeSecondary
 import com.example.ui.theme.PinkPrimary
+import com.example.ui.theme.SoftScreenBackground
+import com.example.ui.theme.appMutedText
+import com.example.ui.theme.appSuccessColor
+import com.example.ui.theme.appSurfaceCard
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
@@ -52,6 +60,7 @@ fun UserDetailScreen(
         userId?.let { viewModel.getUserProfile(it) }
     }
     var showBlockDialog by remember { mutableStateOf(false) }
+    var showReportDialog by remember { mutableStateOf(false) }
     var showFullImage by remember { mutableStateOf(false) }
 
     val bg = MaterialTheme.colorScheme.background
@@ -80,30 +89,28 @@ fun UserDetailScreen(
     }
 
     if (showBlockDialog) {
-        AlertDialog(
-            onDismissRequest = { showBlockDialog = false },
-            title = { Text("Block ${user.name}?") },
-            text = { Text("They won't be able to message or call you. You can unblock them anytime from Settings.") },
-            confirmButton = {
-                TextButton(onClick = {
-                    viewModel.blockUser(user.id, user.name, user.avatarUrl)
-                    showBlockDialog = false
-                    Toast.makeText(context, "${user.name} blocked", Toast.LENGTH_SHORT).show()
-                    onBack()
-                }) {
-                    Text("Block", color = MaterialTheme.colorScheme.error)
-                }
+        BlockUserDialog(
+            userName = user.name,
+            onConfirm = {
+                viewModel.blockUser(user.id, user.name, user.avatarUrl)
+                Toast.makeText(context, "${user.name} blocked", Toast.LENGTH_SHORT).show()
+                onBack()
             },
-            dismissButton = {
-                TextButton(onClick = { showBlockDialog = false }) {
-                    Text("Cancel")
-                }
-            }
+            onDismiss = { showBlockDialog = false }
         )
     }
 
+    if (showReportDialog) {
+        ReportDialog(
+            reportedName = user.name,
+            reportType = ReportType.Profile,
+            onDismiss = { showReportDialog = false }
+        )
+    }
+
+    SoftScreenBackground {
     Scaffold(
-        containerColor = bg,
+        containerColor = Color.Transparent,
         topBar = {
             TopAppBar(
                 title = {
@@ -123,6 +130,13 @@ fun UserDetailScreen(
                         Icon(
                             Icons.Default.ChatBubbleOutline,
                             contentDescription = "Chat",
+                            tint = textColor
+                        )
+                    }
+                    IconButton(onClick = { showReportDialog = true }) {
+                        Icon(
+                            Icons.Default.ReportProblem,
+                            contentDescription = "Report",
                             tint = textColor
                         )
                     }
@@ -272,8 +286,6 @@ fun UserDetailScreen(
                         icon = Icons.Default.Phone,
                         label = "Total Calls",
                         value = user.totalCalls.toString(),
-                        cardBg = cardBg,
-                        borderColor = borderColor,
                         textColor = textColor,
                         modifier = Modifier.weight(1f)
                     )
@@ -281,8 +293,6 @@ fun UserDetailScreen(
                         icon = Icons.Default.DateRange,
                         label = "Member Since",
                         value = user.memberSince,
-                        cardBg = cardBg,
-                        borderColor = borderColor,
                         textColor = textColor,
                         modifier = Modifier.weight(1f)
                     )
@@ -361,12 +371,13 @@ fun UserDetailScreen(
             }
         }
     }
+    }
 }
 
 @Composable
 private fun UserOnlineBadge(isOnline: Boolean) {
     val label = if (isOnline) "Online" else "Offline"
-    val color = if (isOnline) Color(0xFF4CAF50) else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.45f)
+    val color = if (isOnline) appSuccessColor() else appMutedText()
     Row(
         modifier = Modifier
             .clip(RoundedCornerShape(20.dp))
@@ -389,16 +400,12 @@ private fun UserStatCard(
     icon: androidx.compose.ui.graphics.vector.ImageVector,
     label: String,
     value: String,
-    cardBg: Color,
-    borderColor: Color,
     textColor: Color,
     modifier: Modifier = Modifier
 ) {
     Column(
         modifier = modifier
-            .clip(RoundedCornerShape(16.dp))
-            .background(cardBg)
-            .border(1.dp, borderColor, RoundedCornerShape(16.dp))
+            .appSurfaceCard(shape = RoundedCornerShape(18.dp))
             .padding(14.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
@@ -407,7 +414,7 @@ private fun UserStatCard(
         Text(text = value, color = textColor, fontWeight = FontWeight.Bold, fontSize = 16.sp)
         Text(
             text = label,
-            color = textColor.copy(alpha = 0.55f),
+            color = appMutedText(),
             fontSize = 12.sp
         )
     }

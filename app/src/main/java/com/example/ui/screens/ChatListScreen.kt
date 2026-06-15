@@ -38,6 +38,7 @@ import com.example.ui.theme.appOutlinedFieldColors
 import com.example.ui.theme.appSecondaryText
 import com.example.ui.theme.appSoftShadow
 import com.example.ui.theme.appSurfaceCard
+import com.example.ui.theme.appSuccessColor
 import com.example.ui.theme.appTitleText
 import com.example.ui.theme.AppBorderWeight
 import com.example.ui.theme.isAppDarkTheme
@@ -158,7 +159,7 @@ fun ChatListScreen(
                     fontWeight = FontWeight.Black
                 )
                 Text(
-                    text = if (isModelSide) "Conversations with your fans" else "Stay connected with creators",
+                    text = if (isModelSide) "Conversations with your fans" else "Stay connected with models",
                     color = appSecondaryText(),
                     fontSize = 14.sp,
                     fontWeight = FontWeight.Medium
@@ -247,7 +248,7 @@ private fun ChatThreadItem(
                         .size(14.dp)
                         .align(Alignment.BottomEnd)
                         .offset(x = 2.dp, y = 2.dp)
-                        .background(Color(0xFF4CAF50), CircleShape)
+                        .background(appSuccessColor(), CircleShape)
                         .border(2.dp, MaterialTheme.colorScheme.surface, CircleShape)
                 )
             }
@@ -268,7 +269,15 @@ private fun ChatThreadItem(
                     fontWeight = FontWeight.Bold,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.weight(1f, fill = false)
+                    modifier = Modifier
+                        .weight(1f, fill = false)
+                        .then(
+                            if (onAvatarClick != null) {
+                                Modifier.clickable(onClick = onAvatarClick)
+                            } else {
+                                Modifier
+                            }
+                        )
                 )
                 if (thread.lastMessageTime.isNotBlank()) {
                     Text(
@@ -350,7 +359,7 @@ private fun ChatEmptyState(isModelSide: Boolean, isSearching: Boolean) {
             text = when {
                 isSearching -> "Try a different search term"
                 isModelSide -> "When users message you, they'll appear here"
-                else -> "Tap a creator's profile to start chatting"
+                else -> "Tap a model's profile to start chatting"
             },
             color = secondaryText,
             fontSize = 14.sp

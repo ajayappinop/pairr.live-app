@@ -16,6 +16,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.MainViewModel
+import com.example.data.formattedBalanceFull
 import com.example.ui.theme.OrangeSecondary
 import com.example.ui.theme.PinkPrimary
 
@@ -52,7 +53,7 @@ fun WalletScreen(viewModel: MainViewModel) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         Text("Current Balance", color = Color.White, style = MaterialTheme.typography.titleMedium)
                         Spacer(modifier = Modifier.height(8.dp))
-                        Text("${wallet.balance} Tokens", color = Color.White, fontSize = 36.sp, fontWeight = FontWeight.Bold)
+                        Text("${wallet.formattedBalanceFull()} Tokens", color = Color.White, fontSize = 36.sp, fontWeight = FontWeight.Bold)
                     }
                 }
             }

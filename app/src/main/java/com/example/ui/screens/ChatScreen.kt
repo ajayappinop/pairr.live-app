@@ -29,6 +29,9 @@ import com.example.MainViewModel
 import com.example.data.ChatMessage
 import com.example.ui.theme.OrangeSecondary
 import com.example.ui.theme.PinkPrimary
+import com.example.ui.theme.SoftScreenBackground
+import com.example.ui.theme.appMutedText
+import com.example.ui.theme.appSuccessColor
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -80,8 +83,9 @@ fun ChatScreen(
     val textColor = MaterialTheme.colorScheme.onSurface
     val pinkGradient = Brush.horizontalGradient(listOf(PinkPrimary, OrangeSecondary))
 
+    SoftScreenBackground {
     Scaffold(
-        containerColor = bg,
+        containerColor = Color.Transparent,
         topBar = {
             Surface(
                 color = cardBg,
@@ -118,7 +122,7 @@ fun ChatScreen(
                             Icon(
                                 Icons.Default.Circle,
                                 contentDescription = "Online",
-                                tint = Color(0xFF4CAF50),
+                                tint = appSuccessColor(),
                                 modifier = Modifier
                                     .size(12.dp)
                                     .align(Alignment.BottomEnd)
@@ -147,7 +151,7 @@ fun ChatScreen(
                         )
                         Text(
                             text = if (isOnline) "Online" else "Offline",
-                            color = if (isOnline) Color(0xFF4CAF50) else textColor.copy(alpha = 0.5f),
+                            color = if (isOnline) appSuccessColor() else appMutedText(),
                             fontSize = 12.sp
                         )
                     }
@@ -233,6 +237,7 @@ fun ChatScreen(
                 }
             }
         }
+    }
     }
 }
 

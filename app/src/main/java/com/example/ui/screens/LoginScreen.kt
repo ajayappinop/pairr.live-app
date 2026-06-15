@@ -5,8 +5,10 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Email
 import androidx.compose.material.icons.filled.Lock
@@ -25,6 +27,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
@@ -80,56 +83,60 @@ fun LoginScreen(
     SoftScreenBackground {
         AuthBackgroundGlows(isDarkTheme = isDarkTheme)
 
-        BoxWithConstraints(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(horizontal = 24.dp)
-        ) {
+        BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
             val compact = maxHeight < 680.dp
             val logoSize = if (compact) 64.dp else 72.dp
             val logoRadius = if (compact) 18.dp else 20.dp
             val brandSize = if (compact) 28.sp else 32.sp
             val sectionGap = if (compact) 12.dp else 16.dp
             val fieldGap = if (compact) 10.dp else 12.dp
+            val topSpacing = if (compact) 16.dp else 32.dp
+            val brandFormGap = if (compact) 24.dp else 36.dp
 
             Column(
-                modifier = Modifier.fillMaxSize(),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.SpaceBetween
+                modifier = Modifier
+                    .fillMaxSize()
+                    .statusBarsPadding()
+                    .navigationBarsPadding()
+                    .imePadding()
+                    .verticalScroll(rememberScrollState())
+                    .padding(horizontal = 24.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                Column(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
-                    Spacer(modifier = Modifier.height(if (compact) 8.dp else 12.dp))
+                Spacer(modifier = Modifier.height(topSpacing))
 
-                    AuthAppLogo(size = logoSize, cornerRadius = logoRadius)
+                AuthAppLogo(size = logoSize, cornerRadius = logoRadius)
 
-                    Spacer(modifier = Modifier.height(if (compact) 8.dp else 10.dp))
+                Spacer(modifier = Modifier.height(if (compact) 8.dp else 10.dp))
 
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(
-                            text = "Pairr",
-                            color = OrangeSecondary,
-                            fontSize = brandSize,
-                            fontWeight = FontWeight.Bold
-                        )
-                        Text(
-                            text = ".live",
-                            color = PinkPrimary,
-                            fontSize = brandSize,
-                            fontWeight = FontWeight.Bold
-                        )
-                    }
-
+                Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
-                        text = "Connect. Chat. Live.",
-                        color = secondaryTextColor,
-                        fontSize = if (compact) 14.sp else 15.sp
+                        text = "Pairr",
+                        color = OrangeSecondary,
+                        fontSize = brandSize,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        text = ".live",
+                        color = PinkPrimary,
+                        fontSize = brandSize,
+                        fontWeight = FontWeight.Bold
                     )
                 }
 
-                Column(modifier = Modifier.fillMaxWidth()) {
+                Text(
+                    text = "Connect. Chat. Live.",
+                    color = secondaryTextColor,
+                    fontSize = if (compact) 14.sp else 15.sp,
+                    textAlign = TextAlign.Center
+                )
+
+                Spacer(modifier = Modifier.height(brandFormGap))
+
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalAlignment = Alignment.Start
+                ) {
                     Text(
                         text = "Welcome Back! 👋",
                         color = textColor,
@@ -160,6 +167,7 @@ fun LoginScreen(
                         shape = fieldShape,
                         colors = textFieldColors,
                         singleLine = true,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
                         isError = phoneError != null,
                         supportingText = {
                             if (phoneError != null) {
@@ -321,10 +329,11 @@ fun LoginScreen(
                     }
                 }
 
+                Spacer(modifier = Modifier.height(if (compact) 20.dp else 28.dp))
+
                 Text(
                     modifier = Modifier
-                        .padding(bottom = 8.dp)
-                        .navigationBarsPadding()
+                        .fillMaxWidth()
                         .clickable { onSignUpClick() },
                     text = buildAnnotatedString {
                         withStyle(style = SpanStyle(color = secondaryTextColor)) {
@@ -334,8 +343,11 @@ fun LoginScreen(
                             append("Sign Up")
                         }
                     },
-                    fontSize = 14.sp
+                    fontSize = 14.sp,
+                    textAlign = TextAlign.Center
                 )
+
+                Spacer(modifier = Modifier.height(16.dp))
             }
         }
     }

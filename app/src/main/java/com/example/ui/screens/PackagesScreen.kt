@@ -31,7 +31,15 @@ import com.example.MainViewModel
 import com.example.ui.theme.AppFilterChip
 import com.example.ui.theme.OrangeSecondary
 import com.example.ui.theme.PinkPrimary
+import com.example.ui.theme.SoftScreenBackground
+import com.example.ui.theme.appErrorColor
+import com.example.ui.theme.appErrorContainer
 import com.example.ui.theme.appMutedText
+import com.example.ui.theme.appSuccessColor
+import com.example.ui.theme.appSuccessContainer
+import com.example.ui.theme.appSurfaceCard
+import com.example.ui.theme.appVideoAccentColor
+import com.example.ui.theme.appVideoAccentContainer
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -97,8 +105,9 @@ fun PackagesScreen(
                 )
             )
         },
-        containerColor = MaterialTheme.colorScheme.background
+        containerColor = Color.Transparent
     ) { paddingValues ->
+        SoftScreenBackground {
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -117,9 +126,7 @@ fun PackagesScreen(
                 Box(
                     modifier = Modifier
                         .weight(1f)
-                        .clip(RoundedCornerShape(16.dp))
-                        .background(cardBg)
-                        .border(1.dp, borderColor, RoundedCornerShape(16.dp))
+                        .appSurfaceCard(shape = RoundedCornerShape(18.dp))
                         .clickable { selectedFilter = "Audio" }
                         .padding(14.dp)
                 ) {
@@ -129,23 +136,23 @@ fun PackagesScreen(
                                 modifier = Modifier
                                     .size(24.dp)
                                     .clip(CircleShape)
-                                    .background(Color(0xFF1B3D2F)),
+                                    .background(appSuccessContainer()),
                                 contentAlignment = Alignment.Center
                             ) {
                                 Icon(
                                     imageVector = Icons.Default.Phone,
                                     contentDescription = "Audio Balance",
-                                    tint = Color(0xFF3DDC84),
+                                    tint = appSuccessColor(),
                                     modifier = Modifier.size(14.dp)
                                 )
                             }
                             Spacer(modifier = Modifier.width(8.dp))
-                            Text("Audio Balance", color = textColor.copy(alpha = 0.5f), fontSize = 11.sp, fontWeight = FontWeight.Medium)
+                            Text("Audio Balance", color = appMutedText(), fontSize = 11.sp, fontWeight = FontWeight.Medium)
                         }
                         Spacer(modifier = Modifier.height(10.dp))
                         Text(
                             text = "${walletState.audioBalance} Audio Tokens",
-                            color = Color(0xFF3DDC84),
+                            color = appSuccessColor(),
                             fontSize = 15.sp,
                             fontWeight = FontWeight.Bold
                         )
@@ -156,9 +163,7 @@ fun PackagesScreen(
                 Box(
                     modifier = Modifier
                         .weight(1f)
-                        .clip(RoundedCornerShape(16.dp))
-                        .background(cardBg)
-                        .border(1.dp, borderColor, RoundedCornerShape(16.dp))
+                        .appSurfaceCard(shape = RoundedCornerShape(18.dp))
                         .clickable { selectedFilter = "Video" }
                         .padding(14.dp)
                 ) {
@@ -168,23 +173,23 @@ fun PackagesScreen(
                                 modifier = Modifier
                                     .size(24.dp)
                                     .clip(CircleShape)
-                                    .background(Color(0xFF3D1B24)),
+                                    .background(appVideoAccentContainer()),
                                 contentAlignment = Alignment.Center
                             ) {
                                 Icon(
                                     imageVector = Icons.Default.Videocam,
                                     contentDescription = "Video Balance",
-                                    tint = Color(0xFFFF4D4D),
+                                    tint = appVideoAccentColor(),
                                     modifier = Modifier.size(14.dp)
                                 )
                             }
                             Spacer(modifier = Modifier.width(8.dp))
-                            Text("Video Balance", color = textColor.copy(alpha = 0.5f), fontSize = 11.sp, fontWeight = FontWeight.Medium)
+                            Text("Video Balance", color = appMutedText(), fontSize = 11.sp, fontWeight = FontWeight.Medium)
                         }
                         Spacer(modifier = Modifier.height(10.dp))
                         Text(
                             text = "${walletState.videoBalance} Video Tokens",
-                            color = Color(0xFFFF4D4D),
+                            color = appVideoAccentColor(),
                             fontSize = 15.sp,
                             fontWeight = FontWeight.Bold
                         )
@@ -203,7 +208,7 @@ fun PackagesScreen(
                 Icon(
                     imageVector = Icons.Default.FilterList,
                     contentDescription = "Filter",
-                    tint = textColor.copy(alpha = 0.5f),
+                    tint = appMutedText(),
                     modifier = Modifier.size(18.dp)
                 )
                 
@@ -233,7 +238,7 @@ fun PackagesScreen(
                         .weight(1f),
                     contentAlignment = Alignment.Center
                 ) {
-                    Text("No packages found under this filter.", color = Color.Gray)
+                    Text("No packages found under this filter.", color = appMutedText())
                 }
             } else {
                 LazyColumn(
@@ -246,9 +251,7 @@ fun PackagesScreen(
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .clip(RoundedCornerShape(18.dp))
-                                .background(cardBg)
-                                .border(1.dp, borderColor, RoundedCornerShape(18.dp))
+                                .appSurfaceCard(shape = RoundedCornerShape(18.dp))
                                 .clickable { showPurchaseConfirmDialog = plan }
                                 .padding(16.dp),
                             horizontalArrangement = Arrangement.SpaceBetween,
@@ -259,13 +262,13 @@ fun PackagesScreen(
                                     modifier = Modifier
                                         .size(44.dp)
                                         .clip(CircleShape)
-                                        .background(if (plan.isVideo) Color(0xFF3D1B24) else Color(0xFF1B3D2F)),
+                                        .background(if (plan.isVideo) appVideoAccentContainer() else appSuccessContainer()),
                                     contentAlignment = Alignment.Center
                                 ) {
                                     Icon(
                                         imageVector = if (plan.isVideo) Icons.Default.Videocam else Icons.Default.Phone,
                                         contentDescription = if (plan.isVideo) "Video Pack" else "Audio Pack",
-                                        tint = if (plan.isVideo) Color(0xFFFF4D4D) else Color(0xFF3DDC84),
+                                        tint = if (plan.isVideo) appVideoAccentColor() else appSuccessColor(),
                                         modifier = Modifier.size(22.dp)
                                     )
                                 }
@@ -280,7 +283,7 @@ fun PackagesScreen(
                                     Spacer(modifier = Modifier.height(4.dp))
                                     Text(
                                         text = "${plan.tokens} Tokens • ${plan.bonus}",
-                                        color = textColor.copy(alpha = 0.5f),
+                                        color = appMutedText(),
                                         fontSize = 12.sp
                                     )
                                 }
@@ -288,7 +291,7 @@ fun PackagesScreen(
                             Column(horizontalAlignment = Alignment.End) {
                                 Text(
                                     text = plan.price,
-                                    color = if (plan.isVideo) Color(0xFFFF4D4D) else Color(0xFF3DDC84),
+                                    color = if (plan.isVideo) appVideoAccentColor() else appSuccessColor(),
                                     fontSize = 16.sp,
                                     fontWeight = FontWeight.Bold
                                 )
@@ -299,6 +302,7 @@ fun PackagesScreen(
                     }
                 }
             }
+        }
         }
     }
 

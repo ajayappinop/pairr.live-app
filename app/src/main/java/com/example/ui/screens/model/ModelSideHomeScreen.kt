@@ -31,14 +31,27 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
+import com.example.CallBooking
 import com.example.MainViewModel
-import com.example.ui.theme.PinkPrimary
+import com.example.data.displayProfilePhotoUrl
+import com.example.ui.components.NotificationsSheet
+import com.example.ui.components.ReportDialog
+import com.example.ui.components.ReportType
 import com.example.ui.theme.OrangeSecondary
+import com.example.ui.theme.PinkPrimary
+import com.example.ui.theme.SoftScreenBackground
+import com.example.ui.theme.appMutedText
+import com.example.ui.theme.appSuccessColor
+import com.example.ui.theme.appSurfaceCard
+import com.example.ui.theme.isCompactWidth
 import kotlinx.coroutines.delay
 
 @OptIn(ExperimentalAnimationApi::class)
 @Composable
-fun ModelSideHomeScreen(viewModel: MainViewModel) {
+fun ModelSideHomeScreen(
+    viewModel: MainViewModel,
+    onUserClick: (String) -> Unit = {}
+) {
     val bg = MaterialTheme.colorScheme.background
     val cardBg = MaterialTheme.colorScheme.surface
     val cardBgLighter = MaterialTheme.colorScheme.surfaceVariant
@@ -46,6 +59,7 @@ fun ModelSideHomeScreen(viewModel: MainViewModel) {
     val pinkGradient = Brush.horizontalGradient(listOf(PinkPrimary, OrangeSecondary))
     val textColor = MaterialTheme.colorScheme.onSurface
     val secondaryTextColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+    val offlineColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.35f)
     
     val greenGlow = Color(0xFF00E676)
     val amberGlow = Color(0xFFFFB300)
@@ -60,9 +74,39 @@ fun ModelSideHomeScreen(viewModel: MainViewModel) {
     val weeklyEarn by viewModel.modelWeeklyEarnings.collectAsStateWithLifecycle()
     val monthlyEarn by viewModel.modelMonthlyEarnings.collectAsStateWithLifecycle()
     val lifetimeEarn by viewModel.modelLifetimeEarnings.collectAsStateWithLifecycle()
+    val models by viewModel.models.collectAsStateWithLifecycle()
+    val currentModel = models.find { it.id == viewModel.getCurrentModelId() }
+    val profilePhotoUrl = currentModel?.displayProfilePhotoUrl()
+        ?: "https://i.pravatar.cc/300?u=${viewModel.getCurrentModelId() ?: "model"}"
+    val modelUsername by viewModel.modelProfileUsername.collectAsStateWithLifecycle()
+    val bookings by viewModel.bookings.collectAsStateWithLifecycle()
+    val currentModelId = viewModel.getCurrentModelId()
+    val scheduledCalls = remember(bookings, currentModelId) {
+        if (currentModelId.isNullOrBlank()) emptyList()
+        else bookings.filter {
+            it.modelId == currentModelId && (it.status == "Scheduled" || it.status == "Accepted")
+        }
+    }
+    val awaitingAcceptanceCount = scheduledCalls.count { it.status == "Scheduled" }
     
     var incomingCallSimulate by remember { mutableStateOf(false) }
-    var selectedChartBar by remember { mutableStateOf<String?>(null) }
+    var activeScheduledBooking by remember { mutableStateOf<CallBooking?>(null) }
+    var showCallReportDialog by remember { mutableStateOf(false) }
+    var showNotificationsSheet by remember { mutableStateOf(false) }
+    val modelNotifications by viewModel.modelNotifications.collectAsStateWithLifecycle()
+    val unreadNotificationCount = modelNotifications.count { !it.isRead }
+    val demoCallerName = "Ramesh K."
+    val demoCallerUserId = remember { viewModel.resolveUserIdByDisplayName(demoCallerName) }
+    val activeCallerName = activeScheduledBooking?.userName?.takeIf { it.isNotBlank() } ?: demoCallerName
+    val activeCallerUserId = activeScheduledBooking?.userId?.takeIf { it.isNotBlank() }
+        ?: demoCallerUserId
+    val activeCallerAvatar = activeScheduledBooking?.userAvatarUrl?.takeIf { it.isNotBlank() }
+        ?: "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?ixlib=rb-4.0.3&auto=format&fit=crop&w=300&q=80"
+    val activeCallIsVideo = activeScheduledBooking?.isVideo ?: true
+    val activeCallCost = activeScheduledBooking?.cost
+    val openCallerProfile = {
+        if (activeCallerUserId.isNotBlank()) onUserClick(activeCallerUserId)
+    }
     
     // Breathing scale for active online simulation button
     val infiniteTransition = rememberInfiniteTransition(label = "pulse")
@@ -85,10 +129,7 @@ fun ModelSideHomeScreen(viewModel: MainViewModel) {
         label = "glow_alpha"
     )
 
-    Box(modifier = Modifier.fillMaxSize().background(bg)) {
-        // Gradient atmosphere background
-        Box(modifier = Modifier.fillMaxSize().background(radialBgGradient))
-        
+    SoftScreenBackground {
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -105,7 +146,7 @@ fun ModelSideHomeScreen(viewModel: MainViewModel) {
             ) {
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        text = "Good day, Alessia! ✨",
+                        text = "Good day, $modelUsername! ✨",
                         color = textColor,
                         fontSize = 24.sp,
                         fontWeight = FontWeight.ExtraBold,
@@ -121,22 +162,46 @@ fun ModelSideHomeScreen(viewModel: MainViewModel) {
                                     when (availability) {
                                         "Online" -> greenGlow
                                         "Busy" -> amberGlow
-                                        else -> Color.Gray
+                                        else -> offlineColor
                                     }
                                 )
                         )
                         Spacer(modifier = Modifier.width(6.dp))
                         Text(
                             text = "Status: $availability",
-                            color = textColor.copy(alpha = 0.5f),
+                            color = appMutedText(),
                             fontSize = 13.sp,
                             fontWeight = FontWeight.Medium
                         )
                     }
                 }
                 
-                // Advanced bordered avatar with pulsing ring
-                Box(contentAlignment = Alignment.Center) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Box(
+                        modifier = Modifier.clickable { showNotificationsSheet = true }
+                    ) {
+                        Icon(
+                            Icons.Outlined.Notifications,
+                            contentDescription = "Notifications",
+                            tint = textColor,
+                            modifier = Modifier.size(26.dp)
+                        )
+                        if (unreadNotificationCount > 0) {
+                            Box(
+                                modifier = Modifier
+                                    .size(10.dp)
+                                    .background(PinkPrimary, CircleShape)
+                                    .border(1.5.dp, bg, CircleShape)
+                                    .align(Alignment.TopEnd)
+                            )
+                        }
+                    }
+
+                    // Advanced bordered avatar with pulsing ring
+                    Box(contentAlignment = Alignment.Center) {
                     if (availability == "Online") {
                         Box(
                             modifier = Modifier
@@ -146,7 +211,7 @@ fun ModelSideHomeScreen(viewModel: MainViewModel) {
                         )
                     }
                     AsyncImage(
-                        model = "https://images.unsplash.com/photo-1494790108377-be9c29b29330?ixlib=rb-4.0.3&auto=format&fit=crop&w=150&q=80",
+                        model = profilePhotoUrl,
                         contentDescription = "Profile Avatar",
                         modifier = Modifier
                             .size(50.dp)
@@ -157,117 +222,30 @@ fun ModelSideHomeScreen(viewModel: MainViewModel) {
                             },
                         contentScale = ContentScale.Crop
                     )
-                }
-            }
-            
-            Spacer(modifier = Modifier.height(24.dp))
-            
-            // Live Status Card Overview
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(24.dp))
-                    .background(pinkGradient)
-                    .padding(1.dp)
-            ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(23.dp))
-                        .background(cardBg)
-                        .padding(20.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    Column {
-                        Text(
-                            text = "LIFETIME RECHARGE VALUE",
-                            color = textColor.copy(alpha = 0.5f),
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.Bold,
-                            letterSpacing = 1.sp
-                        )
-                        Spacer(modifier = Modifier.height(6.dp))
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text(
-                                text = "$lifetimeEarn",
-                                color = textColor,
-                                fontSize = 32.sp,
-                                fontWeight = FontWeight.Black
-                            )
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text(
-                                text = "Tokens",
-                                color = PinkPrimary,
-                                fontSize = 16.sp,
-                                fontWeight = FontWeight.Bold
-                            )
-                        }
-                    }
-                    Box(
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(12.dp))
-                            .background(PinkPrimary.copy(alpha = 0.15f))
-                            .border(1.dp, PinkPrimary.copy(alpha = 0.3f), RoundedCornerShape(12.dp))
-                            .padding(horizontal = 12.dp, vertical = 6.dp)
-                    ) {
-                        Text("DIAMOND RANK 💎", color = PinkPrimary, fontSize = 11.sp, fontWeight = FontWeight.Bold)
                     }
                 }
             }
             
             Spacer(modifier = Modifier.height(24.dp))
             
-            // Availability controls
-            Text("Set Active Mode", color = textColor, fontSize = 18.sp, fontWeight = FontWeight.Bold)
-            Spacer(modifier = Modifier.height(12.dp))
+            LifetimeRechargeCard(
+                lifetimeEarn = lifetimeEarn,
+                monthlyEarn = monthlyEarn,
+                pinkGradient = pinkGradient
+            )
             
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(cardBg, RoundedCornerShape(18.dp))
-                    .border(1.dp, borderColor, RoundedCornerShape(18.dp))
-                    .padding(6.dp),
-                horizontalArrangement = Arrangement.spacedBy(6.dp)
-            ) {
-                val statuses = listOf(
-                    Triple("Online", greenGlow, Icons.Default.Circle),
-                    Triple("Busy", amberGlow, Icons.Default.PauseCircle),
-                    Triple("Offline", Color.Gray, Icons.Default.Cancel)
-                )
-                
-                statuses.forEach { (status, color, icon) ->
-                    val isSelected = availability == status
-                    Surface(
-                        color = if (isSelected) color.copy(alpha = 0.12f) else Color.Transparent,
-                        contentColor = if (isSelected) color else textColor.copy(alpha = 0.5f),
-                        shape = RoundedCornerShape(14.dp),
-                        modifier = Modifier
-                            .weight(1f)
-                            .clickable { viewModel.setModelAvailability(status) }
-                    ) {
-                        Row(
-                            horizontalArrangement = Arrangement.Center,
-                            verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier.padding(vertical = 12.dp, horizontal = 4.dp)
-                        ) {
-                            Icon(
-                                imageVector = icon, 
-                                contentDescription = null, 
-                                tint = if (isSelected) color else textColor.copy(alpha = 0.3f),
-                                modifier = Modifier.size(16.dp)
-                            )
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text(
-                                text = status, 
-                                color = if (isSelected) textColor else textColor.copy(alpha = 0.5f), 
-                                fontSize = 13.sp, 
-                                fontWeight = FontWeight.Bold
-                            )
-                        }
-                    }
-                }
-            }
+            Spacer(modifier = Modifier.height(24.dp))
+            
+            ModelActiveModeSection(
+                availability = availability,
+                textColor = textColor,
+                borderColor = borderColor,
+                cardBg = cardBg,
+                greenGlow = greenGlow,
+                amberGlow = amberGlow,
+                offlineColor = offlineColor,
+                onModeSelected = { viewModel.setModelAvailability(it) }
+            )
             
             Spacer(modifier = Modifier.height(24.dp))
             
@@ -305,267 +283,88 @@ fun ModelSideHomeScreen(viewModel: MainViewModel) {
                     Column {
                         Icon(Icons.Default.FlashOn, contentDescription = null, tint = Color.Yellow, modifier = Modifier.size(24.dp))
                         Spacer(modifier = Modifier.height(8.dp))
-                        Text("Active Requests", color = textColor.copy(alpha = 0.5f), fontSize = 12.sp, fontWeight = FontWeight.Medium)
-                        Text("3 Pending", color = textColor, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                        Text("Scheduled Calls", color = textColor.copy(alpha = 0.5f), fontSize = 12.sp, fontWeight = FontWeight.Medium)
+                        Text(
+                            text = if (scheduledCalls.isEmpty()) {
+                                "None"
+                            } else if (awaitingAcceptanceCount > 0) {
+                                "$awaitingAcceptanceCount Scheduled"
+                            } else {
+                                "${scheduledCalls.size} Scheduled"
+                            },
+                            color = textColor,
+                            fontSize = 18.sp,
+                            fontWeight = FontWeight.Bold
+                        )
                     }
                 }
             }
 
             Spacer(modifier = Modifier.height(24.dp))
             
-            // --- PENDING REQUESTS SECTION ---
-            Text("Pending Call Requests", color = textColor, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+            // --- SCHEDULED CALLS SECTION ---
+            Text("Scheduled Call Requests", color = textColor, fontSize = 18.sp, fontWeight = FontWeight.Bold)
             Spacer(modifier = Modifier.height(12.dp))
             
-            val pendingRequests = listOf(
-                Pair("Rahul Sharma", "150 Tokens/min"),
-                Pair("Vikram Singh", "180 Tokens/min"),
-                Pair("Ananya K.", "200 Tokens/min")
-            )
-            
-            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                pendingRequests.forEach { (name, rate) ->
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .background(cardBg, RoundedCornerShape(16.dp))
-                            .border(1.dp, borderColor, RoundedCornerShape(16.dp))
-                            .padding(12.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .size(44.dp)
-                                .clip(CircleShape)
-                                .background(cardBgLighter),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text(name.take(1), color = PinkPrimary, fontWeight = FontWeight.Bold)
-                        }
-                        Spacer(modifier = Modifier.width(12.dp))
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(name, color = textColor, fontSize = 14.sp, fontWeight = FontWeight.Bold)
-                            Text(rate, color = textColor.copy(alpha = 0.5f), fontSize = 12.sp)
-                        }
-                        Button(
-                            onClick = { incomingCallSimulate = true },
-                            colors = ButtonDefaults.buttonColors(containerColor = PinkPrimary),
-                            shape = RoundedCornerShape(8.dp),
-                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
-                            modifier = Modifier.height(32.dp)
-                        ) {
-                            Text("Accept", fontSize = 12.sp, color = Color.White)
-                        }
-                    }
-                }
-            }
-
-            Spacer(modifier = Modifier.height(24.dp))
-            
-            // Analytics / Performance Overview Card
-            Text("Token Analytics", color = textColor, fontSize = 18.sp, fontWeight = FontWeight.Bold)
-            Spacer(modifier = Modifier.height(12.dp))
-            
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(cardBg, RoundedCornerShape(24.dp))
-                    .border(1.dp, borderColor, RoundedCornerShape(24.dp))
-                    .padding(20.dp)
-            ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Column {
-                        Text("Earnings Pulse Tracker", color = textColor, fontSize = 16.sp, fontWeight = FontWeight.Bold)
-                        Text("Compare daily, weekly and monthly intake", color = textColor.copy(alpha = 0.5f), fontSize = 12.sp)
-                    }
-                    IconButton(
-                        onClick = { selectedChartBar = null },
-                        colors = IconButtonDefaults.iconButtonColors(containerColor = cardBgLighter)
-                    ) {
-                        Icon(Icons.Default.Refresh, contentDescription = "Reset Chart", tint = textColor.copy(alpha = 0.5f))
-                    }
-                }
-                
-                Spacer(modifier = Modifier.height(28.dp))
-                
-                val maxVal = maxOf(dailyEarn, weeklyEarn, monthlyEarn, 1).toFloat()
-                
-                Row(
+            if (scheduledCalls.isEmpty()) {
+                Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(180.dp)
-                        .padding(horizontal = 8.dp),
-                    horizontalArrangement = Arrangement.SpaceEvenly,
-                    verticalAlignment = Alignment.Bottom
+                        .appSurfaceCard(shape = RoundedCornerShape(16.dp))
+                        .padding(20.dp),
+                    contentAlignment = Alignment.Center
                 ) {
-                    // Daily Card/Bar
-                    val isDailySelected = selectedChartBar == "Daily"
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.Bottom,
-                        modifier = Modifier
-                            .fillMaxHeight()
-                            .weight(1f)
-                            .clip(RoundedCornerShape(12.dp))
-                            .clickable { selectedChartBar = "Daily" }
-                            .background(if (isDailySelected) cardBgLighter else Color.Transparent)
-                            .padding(vertical = 8.dp)
-                    ) {
-                        Text(
-                            text = "${dailyEarn} Tokens", 
-                            color = if (isDailySelected) textColor else textColor.copy(alpha = 0.5f), 
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.Bold
-                        )
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Box(
-                            modifier = Modifier
-                                .width(36.dp)
-                                .fillMaxHeight(dailyEarn / maxVal)
-                                .background(
-                                    brush = Brush.verticalGradient(listOf(Color(0xFFFFD54F), Color(0xFFFF8F00))),
-                                    shape = RoundedCornerShape(topStart = 10.dp, topEnd = 10.dp)
-                                )
-                                .border(
-                                    width = if (isDailySelected) 2.dp else 0.dp,
-                                    color = textColor,
-                                    shape = RoundedCornerShape(topStart = 10.dp, topEnd = 10.dp)
-                                )
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Icon(
+                            Icons.Outlined.Schedule,
+                            contentDescription = null,
+                            tint = secondaryTextColor,
+                            modifier = Modifier.size(28.dp)
                         )
                         Spacer(modifier = Modifier.height(8.dp))
                         Text(
-                            text = "Daily", 
-                            color = if (isDailySelected) PinkPrimary else textColor.copy(alpha = 0.4f), 
-                            fontSize = 13.sp,
-                            fontWeight = FontWeight.Bold
+                            "No scheduled requests yet",
+                            color = textColor,
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.SemiBold
                         )
-                    }
-                    
-                    // Weekly Card/Bar
-                    val isWeeklySelected = selectedChartBar == "Weekly"
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.Bottom,
-                        modifier = Modifier
-                            .fillMaxHeight()
-                            .weight(1f)
-                            .clip(RoundedCornerShape(12.dp))
-                            .clickable { selectedChartBar = "Weekly" }
-                            .background(if (isWeeklySelected) cardBgLighter else Color.Transparent)
-                            .padding(vertical = 8.dp)
-                    ) {
                         Text(
-                            text = "${weeklyEarn} Tokens", 
-                            color = if (isWeeklySelected) textColor else textColor.copy(alpha = 0.5f), 
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.Bold
-                        )
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Box(
-                            modifier = Modifier
-                                .width(36.dp)
-                                .fillMaxHeight(weeklyEarn / maxVal)
-                                .background(
-                                    brush = Brush.verticalGradient(listOf(PinkPrimary, OrangeSecondary)),
-                                    shape = RoundedCornerShape(topStart = 10.dp, topEnd = 10.dp)
-                                )
-                                .border(
-                                    width = if (isWeeklySelected) 2.dp else 0.dp,
-                                    color = textColor,
-                                    shape = RoundedCornerShape(topStart = 10.dp, topEnd = 10.dp)
-                                )
-                        )
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Text(
-                            text = "Weekly", 
-                            color = if (isWeeklySelected) PinkPrimary else textColor.copy(alpha = 0.4f), 
-                            fontSize = 13.sp,
-                            fontWeight = FontWeight.Bold
-                        )
-                    }
-                    
-                    // Monthly Card/Bar
-                    val isMonthlySelected = selectedChartBar == "Monthly"
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.Bottom,
-                        modifier = Modifier
-                            .fillMaxHeight()
-                            .weight(1f)
-                            .clip(RoundedCornerShape(12.dp))
-                            .clickable { selectedChartBar = "Monthly" }
-                            .background(if (isMonthlySelected) cardBgLighter else Color.Transparent)
-                            .padding(vertical = 8.dp)
-                    ) {
-                        Text(
-                            text = "${monthlyEarn} Tokens", 
-                            color = if (isMonthlySelected) textColor else textColor.copy(alpha = 0.5f), 
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.Bold
-                        )
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Box(
-                            modifier = Modifier
-                                .width(36.dp)
-                                .fillMaxHeight(monthlyEarn / maxVal)
-                                .background(
-                                    brush = Brush.verticalGradient(listOf(Color(0xFF81C784), Color(0xFF2E7D32))),
-                                    shape = RoundedCornerShape(topStart = 10.dp, topEnd = 10.dp)
-                                )
-                                .border(
-                                    width = if (isMonthlySelected) 2.dp else 0.dp,
-                                    color = textColor,
-                                    shape = RoundedCornerShape(topStart = 10.dp, topEnd = 10.dp)
-                                )
-                        )
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Text(
-                            text = "Monthly", 
-                            color = if (isMonthlySelected) Color.Green else textColor.copy(alpha = 0.4f), 
-                            fontSize = 13.sp,
-                            fontWeight = FontWeight.Bold
+                            "Users who book a session with you will appear here.",
+                            color = secondaryTextColor,
+                            fontSize = 12.sp,
+                            textAlign = TextAlign.Center
                         )
                     }
                 }
-                
-                // Explanatory breakdown text context
-                AnimatedVisibility(
-                    visible = selectedChartBar != null,
-                    enter = fadeIn() + expandVertically(),
-                    exit = fadeOut() + shrinkVertically()
-                ) {
-                    val label = selectedChartBar ?: ""
-                    val amount = when (label) {
-                        "Daily" -> dailyEarn
-                        "Weekly" -> weeklyEarn
-                        "Monthly" -> monthlyEarn
-                        else -> 0
-                    }
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(top = 16.dp)
-                            .background(cardBgLighter, RoundedCornerShape(14.dp))
-                            .padding(14.dp)
-                    ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(Icons.Default.TrendingUp, contentDescription = null, tint = PinkPrimary)
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text("$label Activity Statement", color = textColor, fontSize = 14.sp, fontWeight = FontWeight.Bold)
-                        }
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Text(
-                            text = "Your intake is highly positive! Average rating generated from $amount tokens is 4.98 stars. Well done!",
-                            color = textColor.copy(alpha = 0.5f),
-                            fontSize = 12.sp
+            } else {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    scheduledCalls.forEach { booking ->
+                        ScheduledCallRequestCard(
+                            booking = booking,
+                            textColor = textColor,
+                            secondaryTextColor = secondaryTextColor,
+                            cardBgLighter = cardBgLighter,
+                            onUserClick = onUserClick,
+                            onAccept = { viewModel.acceptBooking(booking.id) },
+                            onCall = {
+                                activeScheduledBooking = booking
+                                incomingCallSimulate = true
+                            }
                         )
                     }
                 }
             }
+
+            Spacer(modifier = Modifier.height(24.dp))
+            
+            TokenAnalyticsSection(
+                dailyEarn = dailyEarn,
+                weeklyEarn = weeklyEarn,
+                monthlyEarn = monthlyEarn,
+                textColor = textColor,
+                borderColor = borderColor,
+                cardBgLighter = cardBgLighter
+            )
             
             Spacer(modifier = Modifier.height(28.dp))
             
@@ -665,12 +464,13 @@ fun ModelSideHomeScreen(viewModel: MainViewModel) {
                                     .background(PinkPrimary.copy(alpha = 0.25f))
                             )
                             AsyncImage(
-                                model = "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?ixlib=rb-4.0.3&auto=format&fit=crop&w=300&q=80",
-                                contentDescription = "Ramesh Caller Avatar",
+                                model = activeCallerAvatar,
+                                contentDescription = "$activeCallerName avatar",
                                 modifier = Modifier
                                     .size(110.dp)
                                     .clip(CircleShape)
-                                    .border(4.dp, PinkPrimary, CircleShape),
+                                    .border(4.dp, PinkPrimary, CircleShape)
+                                    .clickable(onClick = openCallerProfile),
                                 contentScale = ContentScale.Crop
                             )
                         }
@@ -678,17 +478,18 @@ fun ModelSideHomeScreen(viewModel: MainViewModel) {
                         Spacer(modifier = Modifier.height(28.dp))
                         
                         Text(
-                            text = "Incoming Video Session...", 
+                            text = if (activeCallIsVideo) "Incoming Video Session..." else "Incoming Audio Session...",
                             color = Color.LightGray.copy(alpha = 0.8f), 
                             fontSize = 16.sp, 
                             fontWeight = FontWeight.Medium
                         )
                         Spacer(modifier = Modifier.height(6.dp))
                         Text(
-                            text = "Ramesh K.", 
+                            text = activeCallerName, 
                             color = Color.White, 
                             fontSize = 32.sp, 
-                            fontWeight = FontWeight.Black
+                            fontWeight = FontWeight.Black,
+                            modifier = Modifier.clickable(onClick = openCallerProfile)
                         )
                         Spacer(modifier = Modifier.height(8.dp))
                         Box(
@@ -698,7 +499,12 @@ fun ModelSideHomeScreen(viewModel: MainViewModel) {
                                 .border(1.dp, PinkPrimary.copy(alpha = 0.4f), RoundedCornerShape(30.dp))
                                 .padding(horizontal = 14.dp, vertical = 6.dp)
                         ) {
-                            Text("150 Tokens / min", color = PinkPrimary, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                            Text(
+                                text = activeCallCost?.let { "$it Tokens reserved" } ?: "150 Tokens / min",
+                                color = PinkPrimary,
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Bold
+                            )
                         }
                         
                         Spacer(modifier = Modifier.height(64.dp))
@@ -709,7 +515,10 @@ fun ModelSideHomeScreen(viewModel: MainViewModel) {
                         ) {
                             // Decline session
                             IconButton(
-                                onClick = { incomingCallSimulate = false },
+                                onClick = {
+                                    incomingCallSimulate = false
+                                    activeScheduledBooking = null
+                                },
                                 modifier = Modifier
                                     .size(72.dp)
                                     .background(Color.White.copy(alpha = 0.1f), CircleShape)
@@ -756,6 +565,7 @@ fun ModelSideHomeScreen(viewModel: MainViewModel) {
                     }
                     val timeString = String.format("%02d:%02d", seconds / 60, seconds % 60)
                     
+                    val callerName = demoCallerName
                     Box(modifier = Modifier.fillMaxSize()) {
                         // Background full video representation
                         AsyncImage(
@@ -809,6 +619,20 @@ fun ModelSideHomeScreen(viewModel: MainViewModel) {
                             }
                         }
                         
+                        // Top Right: Report call
+                        IconButton(
+                            onClick = { showCallReportDialog = true },
+                            modifier = Modifier
+                                .align(Alignment.TopEnd)
+                                .padding(top = 40.dp, end = 8.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.ReportProblem,
+                                contentDescription = "Report Call",
+                                tint = Color.White.copy(alpha = 0.85f)
+                            )
+                        }
+
                         // Top Left: Client Status & Live Session Analytics
                         Column(
                             modifier = Modifier
@@ -833,10 +657,11 @@ fun ModelSideHomeScreen(viewModel: MainViewModel) {
                             
                             Spacer(modifier = Modifier.height(12.dp))
                             Text(
-                                text = "Ramesh K.", 
+                                text = callerName, 
                                 color = Color.White, 
                                 fontSize = 26.sp, 
-                                fontWeight = FontWeight.Bold
+                                fontWeight = FontWeight.Bold,
+                                modifier = Modifier.clickable(onClick = openCallerProfile)
                             )
                             
                             Spacer(modifier = Modifier.height(6.dp))
@@ -893,7 +718,10 @@ fun ModelSideHomeScreen(viewModel: MainViewModel) {
                                 
                                 // End Call
                                 IconButton(
-                                    onClick = { incomingCallSimulate = false },
+                                    onClick = {
+                                        incomingCallSimulate = false
+                                        activeScheduledBooking = null
+                                    },
                                     modifier = Modifier
                                         .size(72.dp)
                                         .clip(CircleShape)
@@ -928,6 +756,615 @@ fun ModelSideHomeScreen(viewModel: MainViewModel) {
                     }
                 }
             }
+        }
+
+        if (showCallReportDialog) {
+            ReportDialog(
+                reportedName = demoCallerName,
+                reportType = ReportType.Call,
+                callIsVideo = true,
+                onDismiss = { showCallReportDialog = false }
+            )
+        }
+
+        if (showNotificationsSheet) {
+            NotificationsSheet(
+                viewModel = viewModel,
+                onDismiss = { showNotificationsSheet = false },
+                forModel = true
+            )
+        }
+    }
+}
+
+@Composable
+private fun ModelActiveModeSection(
+    availability: String,
+    textColor: Color,
+    borderColor: Color,
+    cardBg: Color,
+    greenGlow: Color,
+    amberGlow: Color,
+    offlineColor: Color,
+    onModeSelected: (String) -> Unit
+) {
+    Text("Set Active Mode", color = textColor, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+    Spacer(modifier = Modifier.height(12.dp))
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(cardBg, RoundedCornerShape(18.dp))
+            .border(1.dp, borderColor, RoundedCornerShape(18.dp))
+            .padding(6.dp),
+        horizontalArrangement = Arrangement.spacedBy(6.dp)
+    ) {
+        val statuses = listOf(
+            Triple("Online", greenGlow, Icons.Default.Circle),
+            Triple("Busy", amberGlow, Icons.Default.PauseCircle),
+            Triple("Offline", offlineColor, Icons.Default.Cancel)
+        )
+
+        statuses.forEach { (status, color, icon) ->
+            val isSelected = availability == status
+            Surface(
+                color = if (isSelected) color.copy(alpha = 0.12f) else Color.Transparent,
+                contentColor = if (isSelected) color else textColor.copy(alpha = 0.5f),
+                shape = RoundedCornerShape(14.dp),
+                modifier = Modifier
+                    .weight(1f)
+                    .clickable { onModeSelected(status) }
+            ) {
+                Row(
+                    horizontalArrangement = Arrangement.Center,
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.padding(vertical = 12.dp, horizontal = 4.dp)
+                ) {
+                    Icon(
+                        imageVector = icon,
+                        contentDescription = null,
+                        tint = if (isSelected) color else textColor.copy(alpha = 0.3f),
+                        modifier = Modifier.size(16.dp)
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        text = status,
+                        color = if (isSelected) textColor else textColor.copy(alpha = 0.5f),
+                        fontSize = 13.sp,
+                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun LifetimeRechargeCard(
+    lifetimeEarn: Int,
+    monthlyEarn: Int,
+    pinkGradient: Brush
+) {
+    val monthlyShare = if (lifetimeEarn > 0) {
+        (monthlyEarn.toFloat() / lifetimeEarn).coerceIn(0f, 1f)
+    } else {
+        0f
+    }
+
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(24.dp))
+            .background(pinkGradient)
+            .padding(18.dp)
+    ) {
+        Box(
+            modifier = Modifier
+                .matchParentSize()
+                .background(
+                    Brush.radialGradient(
+                        colors = listOf(Color.White.copy(alpha = 0.18f), Color.Transparent),
+                        radius = 420f
+                    )
+                )
+        )
+
+        Column(modifier = Modifier.fillMaxWidth()) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box(
+                        modifier = Modifier
+                            .size(44.dp)
+                            .clip(CircleShape)
+                            .background(Color.White.copy(alpha = 0.2f)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            Icons.Default.Diamond,
+                            contentDescription = null,
+                            tint = Color.White,
+                            modifier = Modifier.size(22.dp)
+                        )
+                    }
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Column {
+                        Text(
+                            "Lifetime Recharge Value",
+                            color = Color.White.copy(alpha = 0.9f),
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                        Text(
+                            "Total tokens earned all-time",
+                            color = Color.White.copy(alpha = 0.7f),
+                            fontSize = 11.sp
+                        )
+                    }
+                }
+                Surface(
+                    color = Color.White.copy(alpha = 0.18f),
+                    shape = RoundedCornerShape(20.dp),
+                    border = BorderStroke(1.dp, Color.White.copy(alpha = 0.28f))
+                ) {
+                    Text(
+                        "Diamond 💎",
+                        color = Color.White,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp)
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(18.dp))
+
+            Row(verticalAlignment = Alignment.Bottom) {
+                Text(
+                    text = String.format("%,d", lifetimeEarn),
+                    color = Color.White,
+                    fontSize = 40.sp,
+                    fontWeight = FontWeight.Black,
+                    letterSpacing = (-1).sp
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    "Tokens",
+                    color = Color.White.copy(alpha = 0.85f),
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.padding(bottom = 6.dp)
+                )
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                LifetimeRechargeStatChip(
+                    label = "This Month",
+                    value = String.format("%,d", monthlyEarn),
+                    modifier = Modifier.weight(1f)
+                )
+                LifetimeRechargeStatChip(
+                    label = "Lifetime Share",
+                    value = "${(monthlyShare * 100).toInt()}%",
+                    modifier = Modifier.weight(1f)
+                )
+            }
+
+            Spacer(modifier = Modifier.height(14.dp))
+
+            Column {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text(
+                        "Monthly contribution",
+                        color = Color.White.copy(alpha = 0.75f),
+                        fontSize = 11.sp
+                    )
+                    Text(
+                        "${(monthlyShare * 100).toInt()}%",
+                        color = Color.White,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+                Spacer(modifier = Modifier.height(6.dp))
+                LinearProgressIndicator(
+                    progress = { monthlyShare },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(6.dp)
+                        .clip(RoundedCornerShape(3.dp)),
+                    color = Color.White,
+                    trackColor = Color.White.copy(alpha = 0.22f)
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun LifetimeRechargeStatChip(
+    label: String,
+    value: String,
+    modifier: Modifier = Modifier
+) {
+    Column(
+        modifier = modifier
+            .clip(RoundedCornerShape(14.dp))
+            .background(Color.White.copy(alpha = 0.14f))
+            .border(1.dp, Color.White.copy(alpha = 0.2f), RoundedCornerShape(14.dp))
+            .padding(horizontal = 12.dp, vertical = 10.dp)
+    ) {
+        Text(label, color = Color.White.copy(alpha = 0.75f), fontSize = 10.sp)
+        Spacer(modifier = Modifier.height(2.dp))
+        Text(value, color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.Bold)
+    }
+}
+
+@Composable
+private fun TokenAnalyticsSection(
+    dailyEarn: Int,
+    weeklyEarn: Int,
+    monthlyEarn: Int,
+    textColor: Color,
+    borderColor: Color,
+    cardBgLighter: Color
+) {
+    var selectedPeriod by remember { mutableStateOf("Weekly") }
+    val maxVal = maxOf(dailyEarn, weeklyEarn, monthlyEarn, 1).toFloat()
+
+    val periods = listOf(
+        Triple("Daily", dailyEarn, Icons.Outlined.Today to Color(0xFFFFB300)),
+        Triple("Weekly", weeklyEarn, Icons.Outlined.DateRange to PinkPrimary),
+        Triple("Monthly", monthlyEarn, Icons.Outlined.CalendarMonth to appSuccessColor())
+    )
+
+    Column(modifier = Modifier.fillMaxWidth()) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column {
+                Text("Token Analytics", color = textColor, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                Text(
+                    "Track how your earnings grow over time",
+                    color = textColor.copy(alpha = 0.55f),
+                    fontSize = 12.sp
+                )
+            }
+            Icon(
+                Icons.Outlined.Insights,
+                contentDescription = null,
+                tint = PinkPrimary,
+                modifier = Modifier.size(24.dp)
+            )
+        }
+
+        Spacer(modifier = Modifier.height(12.dp))
+
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .appSurfaceCard(shape = RoundedCornerShape(22.dp))
+                .padding(16.dp)
+        ) {
+            periods.forEachIndexed { index, (label, amount, iconTint) ->
+                val (icon, accent) = iconTint
+                val isSelected = selectedPeriod == label
+                val progress = amount / maxVal
+
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(16.dp))
+                        .background(if (isSelected) cardBgLighter else Color.Transparent)
+                        .clickable { selectedPeriod = label }
+                        .padding(horizontal = 10.dp, vertical = 12.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(40.dp)
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(accent.copy(alpha = 0.14f)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(icon, contentDescription = null, tint = accent, modifier = Modifier.size(20.dp))
+                    }
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                label,
+                                color = if (isSelected) textColor else textColor.copy(alpha = 0.7f),
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                            Text(
+                                String.format("%,d", amount),
+                                color = if (isSelected) accent else textColor.copy(alpha = 0.6f),
+                                fontSize = 15.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(7.dp)
+                                .clip(RoundedCornerShape(4.dp))
+                                .background(borderColor.copy(alpha = 0.35f))
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth(progress.coerceIn(0.08f, 1f))
+                                    .fillMaxHeight()
+                                    .clip(RoundedCornerShape(4.dp))
+                                    .background(
+                                        Brush.horizontalGradient(
+                                            listOf(accent.copy(alpha = 0.65f), accent)
+                                        )
+                                    )
+                            )
+                        }
+                    }
+                }
+
+                if (index < periods.lastIndex) {
+                    HorizontalDivider(
+                        color = borderColor.copy(alpha = 0.45f),
+                        modifier = Modifier.padding(horizontal = 8.dp)
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            val selectedAmount = when (selectedPeriod) {
+                "Daily" -> dailyEarn
+                "Weekly" -> weeklyEarn
+                else -> monthlyEarn
+            }
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(14.dp))
+                    .background(PinkPrimary.copy(alpha = 0.08f))
+                    .border(1.dp, PinkPrimary.copy(alpha = 0.18f), RoundedCornerShape(14.dp))
+                    .padding(12.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(Icons.Default.TrendingUp, contentDescription = null, tint = PinkPrimary, modifier = Modifier.size(18.dp))
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    "$selectedPeriod intake: ${String.format("%,d", selectedAmount)} tokens · Strong performance",
+                    color = textColor.copy(alpha = 0.75f),
+                    fontSize = 12.sp,
+                    lineHeight = 16.sp
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun ScheduledCallRequestCard(
+    booking: CallBooking,
+    textColor: Color,
+    secondaryTextColor: Color,
+    cardBgLighter: Color,
+    onUserClick: (String) -> Unit,
+    onAccept: () -> Unit,
+    onCall: () -> Unit
+) {
+    val isAccepted = booking.status == "Accepted"
+    val callTypeLabel = if (booking.isVideo) "Video" else "Audio"
+    val callTypeColor = if (booking.isVideo) PinkPrimary else appSuccessColor()
+    val compact = isCompactWidth()
+    val userId = booking.userId
+    val avatarUrl = booking.userAvatarUrl.ifBlank {
+        "https://i.pravatar.cc/300?u=${userId.ifBlank { booking.userName }}"
+    }
+    val displayName = booking.userName.ifBlank { "User" }
+    val timeSummary = booking.timeSlot.substringBefore(" -").trim()
+
+    val cardModifier = Modifier
+        .fillMaxWidth()
+        .appSurfaceCard(shape = RoundedCornerShape(16.dp))
+        .padding(12.dp)
+
+    if (compact) {
+        Column(modifier = cardModifier) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                AsyncImage(
+                    model = avatarUrl,
+                    contentDescription = displayName,
+                    modifier = Modifier
+                        .size(44.dp)
+                        .clip(CircleShape)
+                        .background(cardBgLighter)
+                        .clickable(enabled = userId.isNotBlank()) {
+                            if (userId.isNotBlank()) onUserClick(userId)
+                        },
+                    contentScale = ContentScale.Crop
+                )
+                Spacer(modifier = Modifier.width(12.dp))
+                Column(
+                    modifier = Modifier
+                        .weight(1f)
+                        .clickable(enabled = userId.isNotBlank()) {
+                            if (userId.isNotBlank()) onUserClick(userId)
+                        }
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            text = displayName,
+                            color = textColor,
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.Bold,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.weight(1f, fill = false)
+                        )
+                        if (isAccepted) {
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                text = "Confirmed",
+                                color = appSuccessColor(),
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.Bold,
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(6.dp))
+                                    .background(appSuccessColor().copy(alpha = 0.12f))
+                                    .padding(horizontal = 6.dp, vertical = 2.dp)
+                            )
+                        }
+                    }
+                    Spacer(modifier = Modifier.height(2.dp))
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            imageVector = if (booking.isVideo) Icons.Default.Videocam else Icons.Default.Call,
+                            contentDescription = null,
+                            tint = callTypeColor,
+                            modifier = Modifier.size(12.dp)
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(
+                            text = "$callTypeLabel · ${booking.date} · $timeSummary",
+                            color = secondaryTextColor,
+                            fontSize = 11.sp,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                    Text(
+                        text = "${booking.cost} tokens paid",
+                        color = callTypeColor,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                }
+            }
+            Spacer(modifier = Modifier.height(10.dp))
+            Button(
+                onClick = if (isAccepted) onCall else onAccept,
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = if (isAccepted) appSuccessColor() else PinkPrimary
+                ),
+                shape = RoundedCornerShape(8.dp),
+                modifier = Modifier.fillMaxWidth().height(36.dp)
+            ) {
+                Text(
+                    text = if (isAccepted) "Call" else "Accept",
+                    fontSize = 12.sp,
+                    color = Color.White
+                )
+            }
+        }
+        return
+    }
+
+    Row(
+        modifier = cardModifier,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        AsyncImage(
+            model = avatarUrl,
+            contentDescription = displayName,
+            modifier = Modifier
+                .size(44.dp)
+                .clip(CircleShape)
+                .background(cardBgLighter)
+                .clickable(enabled = userId.isNotBlank()) {
+                    if (userId.isNotBlank()) onUserClick(userId)
+                },
+            contentScale = ContentScale.Crop
+        )
+        Spacer(modifier = Modifier.width(12.dp))
+        Column(
+            modifier = Modifier
+                .weight(1f)
+                .clickable(enabled = userId.isNotBlank()) {
+                    if (userId.isNotBlank()) onUserClick(userId)
+                }
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = displayName,
+                    color = textColor,
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f, fill = false)
+                )
+                if (isAccepted) {
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        text = "Confirmed",
+                        color = appSuccessColor(),
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(6.dp))
+                            .background(appSuccessColor().copy(alpha = 0.12f))
+                            .padding(horizontal = 6.dp, vertical = 2.dp)
+                    )
+                }
+            }
+            Spacer(modifier = Modifier.height(2.dp))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    imageVector = if (booking.isVideo) Icons.Default.Videocam else Icons.Default.Call,
+                    contentDescription = null,
+                    tint = callTypeColor,
+                    modifier = Modifier.size(12.dp)
+                )
+                Spacer(modifier = Modifier.width(4.dp))
+                Text(
+                    text = "$callTypeLabel · ${booking.date} · $timeSummary",
+                    color = secondaryTextColor,
+                    fontSize = 11.sp,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+            Text(
+                text = "${booking.cost} tokens paid",
+                color = callTypeColor,
+                fontSize = 11.sp,
+                fontWeight = FontWeight.SemiBold
+            )
+        }
+        Button(
+            onClick = if (isAccepted) onCall else onAccept,
+            colors = ButtonDefaults.buttonColors(
+                containerColor = if (isAccepted) appSuccessColor() else PinkPrimary
+            ),
+            shape = RoundedCornerShape(8.dp),
+            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
+            modifier = Modifier.height(32.dp)
+        ) {
+            Text(
+                text = if (isAccepted) "Call" else "Accept",
+                fontSize = 12.sp,
+                color = Color.White
+            )
         }
     }
 }

@@ -25,6 +25,7 @@ import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.Phone
+import androidx.compose.material.icons.filled.ReportProblem
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -36,6 +37,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
@@ -46,12 +48,23 @@ import com.example.data.displayImageUrls
 import com.example.data.displayProfilePhotoUrl
 import com.example.data.displayIntroVideoUrl
 import com.example.data.mockModels
+import com.example.data.publicUsername
+import com.example.ui.components.BlockUserDialog
 import com.example.ui.components.FullScreenImageDialog
+import com.example.ui.components.ReportDialog
+import com.example.ui.components.ReportType
 import com.example.ui.components.ModelImageGridGallery
 import com.example.ui.components.ModelIntroVideoSection
 import com.example.ui.components.ModelRatePerMinuteRow
 import com.example.ui.theme.PinkPrimary
 import com.example.ui.theme.OrangeSecondary
+import com.example.ui.theme.SoftScreenBackground
+import com.example.ui.theme.appErrorColor
+import com.example.ui.theme.appErrorContainer
+import com.example.ui.theme.appSecondaryText
+import com.example.ui.theme.appStarColor
+import com.example.ui.theme.appSuccessColor
+import com.example.ui.theme.isCompactWidth
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
@@ -80,6 +93,7 @@ fun ModelDetailScreen(
     var showBookingDialog by remember { mutableStateOf(false) }
     var showAllReviewsDialog by remember { mutableStateOf(false) }
     var showBlockDialog by remember { mutableStateOf(false) }
+    var showReportDialog by remember { mutableStateOf(false) }
     var selectedGalleryImage by remember { mutableStateOf<Pair<String, Int>?>(null) }
     val context = LocalContext.current
 
@@ -94,6 +108,7 @@ fun ModelDetailScreen(
     }
 
     val isBlocked = blockedUsers.any { it.id == model.id }
+    val modelUsername = model.publicUsername()
 
     selectedGalleryImage?.let { (url, index) ->
         FullScreenImageDialog(
@@ -105,36 +120,25 @@ fun ModelDetailScreen(
     }
 
     if (showBlockDialog) {
-        AlertDialog(
-            onDismissRequest = { showBlockDialog = false },
-            title = { Text("Block ${model.name}?") },
-            text = { Text("They won't be able to message or call you. You can unblock them anytime from Settings.") },
-            confirmButton = {
-                TextButton(onClick = {
-                    viewModel.blockUser(
-                        userId = model.id,
-                        name = model.name,
-                        avatarUrl = model.displayProfilePhotoUrl()
-                    )
-                    showBlockDialog = false
-                    Toast.makeText(context, "${model.name} blocked", Toast.LENGTH_SHORT).show()
-                    onBack()
-                }) {
-                    Text("Block", color = MaterialTheme.colorScheme.error)
-                }
+        BlockUserDialog(
+            userName = modelUsername,
+            onConfirm = {
+                viewModel.blockUser(
+                    userId = model.id,
+                    name = modelUsername,
+                    avatarUrl = model.displayProfilePhotoUrl()
+                )
+                Toast.makeText(context, "${modelUsername} blocked", Toast.LENGTH_SHORT).show()
+                onBack()
             },
-            dismissButton = {
-                TextButton(onClick = { showBlockDialog = false }) {
-                    Text("Cancel")
-                }
-            }
+            onDismiss = { showBlockDialog = false }
         )
     }
 
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text(model.name, color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Bold) },
+                title = { Text(modelUsername, color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Bold) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(Icons.Default.ArrowBack, contentDescription = "Back", tint = MaterialTheme.colorScheme.onSurface)
@@ -153,10 +157,19 @@ fun ModelDetailScreen(
                         )
                     }
                     IconButton(
+                        onClick = { showReportDialog = true }
+                    ) {
+                        Icon(
+                            Icons.Default.ReportProblem,
+                            contentDescription = "Report",
+                            tint = MaterialTheme.colorScheme.onSurface
+                        )
+                    }
+                    IconButton(
                         onClick = {
                             if (isBlocked) {
                                 viewModel.unblockUser(model.id)
-                                Toast.makeText(context, "${model.name} unblocked", Toast.LENGTH_SHORT).show()
+                                Toast.makeText(context, "${modelUsername} unblocked", Toast.LENGTH_SHORT).show()
                             } else {
                                 showBlockDialog = true
                             }
@@ -175,38 +188,53 @@ fun ModelDetailScreen(
             )
         },
         bottomBar = {
+            val compact = isCompactWidth()
             BottomAppBar(
                 containerColor = MaterialTheme.colorScheme.surface
             ) {
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 16.dp),
+                        .padding(horizontal = if (compact) 8.dp else 16.dp),
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
                     Button(
                         onClick = { onCall(model.id, false) },
                         modifier = Modifier
                             .weight(1f)
-                            .padding(end = 8.dp)
+                            .padding(end = if (compact) 4.dp else 8.dp)
                             .height(48.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+                        contentPadding = PaddingValues(horizontal = if (compact) 6.dp else 12.dp)
                     ) {
-                        Icon(Icons.Default.Call, contentDescription = "Audio Call", tint = MaterialTheme.colorScheme.onSurfaceVariant)
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text("Audio (${model.audioPrice} Tokens/m)", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Icon(Icons.Default.Call, contentDescription = "Audio Call", tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(if (compact) 18.dp else 24.dp))
+                        if (!compact) Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = if (compact) "Audio · ${model.audioPrice}/m" else "Audio (${model.audioPrice} Tokens/m)",
+                            fontSize = if (compact) 10.sp else 12.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
                     }
                     Button(
                         onClick = { onCall(model.id, true) },
                         modifier = Modifier
                             .weight(1f)
-                            .padding(start = 8.dp)
+                            .padding(start = if (compact) 4.dp else 8.dp)
                             .height(48.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = PinkPrimary)
+                        colors = ButtonDefaults.buttonColors(containerColor = PinkPrimary),
+                        contentPadding = PaddingValues(horizontal = if (compact) 6.dp else 12.dp)
                     ) {
-                        Icon(Icons.Default.Videocam, contentDescription = "Video Call", tint = Color.White)
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text("Video (${model.videoPrice} Tokens/m)", fontSize = 12.sp, color = Color.White)
+                        Icon(Icons.Default.Videocam, contentDescription = "Video Call", tint = Color.White, modifier = Modifier.size(if (compact) 18.dp else 24.dp))
+                        if (!compact) Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = if (compact) "Video · ${model.videoPrice}/m" else "Video (${model.videoPrice} Tokens/m)",
+                            fontSize = if (compact) 10.sp else 12.sp,
+                            color = Color.White,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
                     }
                 }
             }
@@ -228,7 +256,7 @@ fun ModelDetailScreen(
                 val profilePhoto = model.displayProfilePhotoUrl()
                 AsyncImage(
                     model = profilePhoto,
-                    contentDescription = model.name,
+                    contentDescription = modelUsername,
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(300.dp)
@@ -252,16 +280,26 @@ fun ModelDetailScreen(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text(model.name, style = MaterialTheme.typography.headlineMedium, color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+                    Text(modelUsername, style = MaterialTheme.typography.headlineMedium, color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
                     Spacer(modifier = Modifier.width(8.dp))
                     AvailabilityBadge(status = model.status)
                 }
                 Spacer(modifier = Modifier.height(8.dp))
                 
-                Row(verticalAlignment = Alignment.CenterVertically) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
                     Icon(Icons.Default.Translate, contentDescription = "Languages", tint = PinkPrimary, modifier = Modifier.size(20.dp))
                     Spacer(modifier = Modifier.width(8.dp))
-                    Text(model.languages.joinToString(", "), style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f))
+                    Text(
+                        model.languages.joinToString(", "),
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+                        modifier = Modifier.weight(1f),
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis
+                    )
                 }
                 
                 Spacer(modifier = Modifier.height(20.dp))
@@ -293,7 +331,10 @@ fun ModelDetailScreen(
                 
                 Text("Categories", style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Bold)
                 Spacer(modifier = Modifier.height(8.dp))
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                FlowRow(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
                     model.categories.forEach { cat ->
                         SuggestionChip(
                             onClick = { },
@@ -316,7 +357,7 @@ fun ModelDetailScreen(
                         .fillMaxWidth()
                         .clickable { showAllReviewsDialog = true }
                 ) {
-                    Icon(Icons.Default.Star, contentDescription = "Rating", tint = Color(0xFFFFD700), modifier = Modifier.size(28.dp))
+                    Icon(Icons.Default.Star, contentDescription = "Rating", tint = appStarColor(), modifier = Modifier.size(28.dp))
                     Spacer(modifier = Modifier.width(6.dp))
                     Text(
                         text = String.format("%.1f", model.rating), 
@@ -336,7 +377,7 @@ fun ModelDetailScreen(
                 
                 if (showAllReviewsDialog) {
                     AllReviewsDialog(
-                        modelName = model.name,
+                        modelName = modelUsername,
                         reviews = reviews.filter { it.modelId == model.id },
                         onDismiss = { showAllReviewsDialog = false }
                     )
@@ -375,7 +416,7 @@ fun ModelDetailScreen(
                                             Icon(
                                                 imageVector = Icons.Default.Star,
                                                 contentDescription = null,
-                                                tint = if (star <= rev.rating) Color(0xFFFFD700) else MaterialTheme.colorScheme.outline,
+                                                tint = if (star <= rev.rating) appStarColor() else MaterialTheme.colorScheme.outline,
                                                 modifier = Modifier.size(12.dp)
                                             )
                                         }
@@ -419,7 +460,7 @@ fun ModelDetailScreen(
                         }
                         Spacer(modifier = Modifier.height(8.dp))
                         Text(
-                            "Avoid wait times by reserving a private 30-min premium voice or video session with ${model.name}. Book now!",
+                            "Avoid wait times by reserving a private 30-min premium voice or video session with ${modelUsername}. Book now!",
                             color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
                             style = MaterialTheme.typography.bodyMedium,
                             lineHeight = 20.sp
@@ -447,6 +488,14 @@ fun ModelDetailScreen(
             viewModel = viewModel,
             onDismiss = { showBookingDialog = false },
             onViewPackages = onViewPackages
+        )
+    }
+
+    if (showReportDialog) {
+        ReportDialog(
+            reportedName = modelUsername,
+            reportType = ReportType.Profile,
+            onDismiss = { showReportDialog = false }
         )
     }
 }
@@ -487,7 +536,7 @@ fun AllReviewsDialog(
                                     Icon(
                                         imageVector = Icons.Default.Star,
                                         contentDescription = null,
-                                        tint = if (star <= rev.rating) Color(0xFFFFD700) else MaterialTheme.colorScheme.outline,
+                                        tint = if (star <= rev.rating) appStarColor() else MaterialTheme.colorScheme.outline,
                                         modifier = Modifier.size(12.dp)
                                     )
                                 }
@@ -516,6 +565,7 @@ fun BookingDialog(
     onDismiss: () -> Unit,
     onViewPackages: (String) -> Unit
 ) {
+    val modelUsername = model.publicUsername()
     val walletState by viewModel.walletState.collectAsState()
     var isVideo by remember { mutableStateOf(false) }
     
@@ -553,7 +603,7 @@ fun BookingDialog(
         onDismissRequest = onDismiss,
         title = {
             Text(
-                text = "Schedule Session with ${model.name}",
+                text = "Schedule Session with ${modelUsername}",
                 color = textColor,
                 fontWeight = FontWeight.Bold,
                 fontSize = 18.sp
@@ -693,7 +743,7 @@ fun BookingDialog(
                         Spacer(modifier = Modifier.height(2.dp))
                         Text(
                             text = "$totalCost ${if (isVideo) "Video" else "Audio"} Tokens",
-                            color = if (isVideo) Color(0xFFFF4D4D) else Color(0xFF3DDC84),
+                            color = if (isVideo) appErrorColor() else appSuccessColor(),
                             fontSize = 15.sp,
                             fontWeight = FontWeight.Bold
                         )
@@ -717,21 +767,21 @@ fun BookingDialog(
                         modifier = Modifier
                             .fillMaxWidth()
                             .clip(RoundedCornerShape(10.dp))
-                            .background(Color(0xFF3E1B24))
-                            .border(1.dp, Color(0xFFFF4D4D).copy(alpha = 0.5f), RoundedCornerShape(10.dp))
+                            .background(appErrorContainer())
+                            .border(1.dp, appErrorColor().copy(alpha = 0.5f), RoundedCornerShape(10.dp))
                             .padding(12.dp)
                     ) {
                         Column {
                             Text(
                                 text = "⚠️ Insufficient Tokens",
-                                color = Color(0xFFFF4D4D),
+                                color = appErrorColor(),
                                 fontSize = 13.sp,
                                 fontWeight = FontWeight.Bold
                             )
                             Spacer(modifier = Modifier.height(4.dp))
                             Text(
                                 text = "You require ${totalCost - balance} more ${if (isVideo) "Video" else "Audio"} token credits to book this session.",
-                                color = Color.LightGray,
+                                color = appSecondaryText(),
                                 fontSize = 11.sp,
                                 lineHeight = 15.sp
                             )
@@ -744,23 +794,29 @@ fun BookingDialog(
             if (hasEnoughBalance) {
                 Button(
                     onClick = {
-                        val success = viewModel.deductTokens(totalCost, isVideo)
-                        if (success) {
-                            val booking = CallBooking(
-                                id = "b_${System.currentTimeMillis()}",
-                                modelId = model.id,
-                                modelName = model.name,
-                                modelAvatarUrl = "https://api.dicebear.com/7.x/bottts/png?seed=${model.id}",
-                                isVideo = isVideo,
-                                date = selectedDate,
-                                timeSlot = selectedSlot,
-                                cost = totalCost
-                            )
-                            viewModel.scheduleCall(booking)
-                            Toast.makeText(context, "Successfully Booked Session with ${model.name}!", Toast.LENGTH_LONG).show()
+                        val booking = CallBooking(
+                            id = "b_${System.currentTimeMillis()}",
+                            modelId = model.id,
+                            modelName = modelUsername,
+                            modelAvatarUrl = "https://api.dicebear.com/7.x/bottts/png?seed=${model.id}",
+                            isVideo = isVideo,
+                            date = selectedDate,
+                            timeSlot = selectedSlot,
+                            cost = totalCost
+                        )
+                        if (viewModel.scheduleCall(booking)) {
+                            Toast.makeText(
+                                context,
+                                "Tokens paid. Session scheduled — waiting for model acceptance.",
+                                Toast.LENGTH_LONG
+                            ).show()
                             onDismiss()
                         } else {
-                            Toast.makeText(context, "Failed to reserve tokens. Please verify your balance.", Toast.LENGTH_SHORT).show()
+                            Toast.makeText(
+                                context,
+                                "Payment failed. Please verify your token balance.",
+                                Toast.LENGTH_SHORT
+                            ).show()
                         }
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = PinkPrimary)

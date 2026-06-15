@@ -35,6 +35,7 @@ import com.example.data.displayCardImageUrl
 import com.example.data.displayImageUrls
 import com.example.data.displayIntroVideoUrl
 import com.example.data.displayProfilePhotoUrl
+import com.example.data.publicUsername
 import com.example.data.storedImageUrls
 import com.example.ui.theme.OrangeSecondary
 import com.example.ui.theme.PinkPrimary
@@ -49,11 +50,12 @@ fun ModelCardMedia(
 ) {
     val introVideo = if (useProfilePhotoOnly) null else model.displayIntroVideoUrl()
     val cardImage = model.displayCardImageUrl()
+    val displayName = model.publicUsername()
 
     Box(modifier = modifier) {
         AsyncImage(
             model = cardImage,
-            contentDescription = model.name,
+            contentDescription = displayName,
             modifier = Modifier.fillMaxSize(),
             contentScale = contentScale
         )
@@ -80,6 +82,7 @@ fun ModelStoryCircle(
 ) {
     val storyRingGradient = Brush.linearGradient(listOf(PinkPrimary, OrangeSecondary, PinkPrimary))
     val imageUrl = model.displayCardImageUrl()
+    val displayName = model.publicUsername()
     val textColor = MaterialTheme.colorScheme.onSurface
     val secondaryText = MaterialTheme.colorScheme.onSurfaceVariant
 
@@ -102,7 +105,7 @@ fun ModelStoryCircle(
             ) {
                 AsyncImage(
                     model = imageUrl,
-                    contentDescription = model.name,
+                    contentDescription = displayName,
                     modifier = Modifier.fillMaxSize(),
                     contentScale = ContentScale.Crop
                 )
@@ -125,7 +128,7 @@ fun ModelStoryCircle(
         Spacer(modifier = Modifier.height(8.dp))
 
         Text(
-            text = model.name.split(" ").firstOrNull() ?: model.name,
+            text = displayName,
             color = textColor,
             fontSize = 12.sp,
             fontWeight = FontWeight.SemiBold,

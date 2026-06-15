@@ -48,7 +48,9 @@ fun MainScreen(
     onViewPackages: (String) -> Unit,
     onViewAll: () -> Unit,
     onLogout: () -> Unit,
-    onUserClick: (String) -> Unit = {}
+    onUserClick: (String) -> Unit = {},
+    onRandomPeerCall: (String) -> Unit = {},
+    onViewAllCallEarnings: () -> Unit = {}
 ) {
     val bottomNavController = rememberNavController()
     val navBackStackEntry by bottomNavController.currentBackStackEntryAsState()
@@ -82,13 +84,17 @@ fun MainScreen(
             composable("home") {
                 val isModel = viewModel.isModelMode.collectAsStateWithLifecycle().value
                 if (isModel) {
-                    com.example.ui.screens.model.ModelSideHomeScreen(viewModel)
+                    com.example.ui.screens.model.ModelSideHomeScreen(
+                        viewModel = viewModel,
+                        onUserClick = onUserClick
+                    )
                 } else {
                     DashboardScreen(
                         viewModel = viewModel,
                         onModelClick = onModelClick,
                         onViewAll = onViewAll,
-                        onViewPackages = onViewPackages
+                        onViewPackages = onViewPackages,
+                        onRandomPeerCall = onRandomPeerCall
                     )
                 }
             }
@@ -110,7 +116,12 @@ fun MainScreen(
             composable("profile") {
                 val isModel = viewModel.isModelMode.collectAsStateWithLifecycle().value
                 if (isModel) {
-                    com.example.ui.screens.model.ModelSideProfileScreen(viewModel, onLogout = onLogout)
+                    com.example.ui.screens.model.ModelSideProfileScreen(
+                        viewModel = viewModel,
+                        onLogout = onLogout,
+                        onUserClick = onUserClick,
+                        onViewAllCallEarnings = onViewAllCallEarnings
+                    )
                 } else {
                     UserProfileScreen(
                         viewModel = viewModel,
@@ -123,7 +134,10 @@ fun MainScreen(
             composable("calls") {
                 val isModel = viewModel.isModelMode.collectAsStateWithLifecycle().value
                 if (isModel) {
-                    com.example.ui.screens.model.ModelSideHistoryScreen()
+                    com.example.ui.screens.model.ModelSideHistoryScreen(
+                        viewModel = viewModel,
+                        onUserClick = onUserClick
+                    )
                 } else {
                     CallDashboardScreen(viewModel = viewModel)
                 }

@@ -58,15 +58,41 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
+import com.example.data.Wallet
+import com.example.data.formattedBalanceFull
+import com.example.data.publicUsername
+import com.example.ui.theme.LightPromoGradients
 import com.example.ui.theme.OrangeSecondary
 import com.example.ui.theme.PinkPrimary
 import com.example.ui.theme.AppSegmentedTabs
 import com.example.ui.theme.DarkPromoGradients
+import com.example.ui.theme.LightOnSurface
+import com.example.ui.theme.SoftScreenBackground
+import com.example.ui.theme.appAudioAccentContainer
+import com.example.ui.theme.appAudioAccentColor
+import com.example.ui.theme.appCaptionText
+import com.example.ui.components.AppActionDialog
+import com.example.ui.components.AppDialogVariant
+import com.example.ui.theme.appErrorColor
+import com.example.ui.theme.appErrorContainer
+import com.example.ui.theme.appInsetSurface
+import com.example.ui.theme.appInsetSurfaceBorder
 import com.example.ui.theme.appMutedText
+import com.example.ui.theme.appOutlinedFieldColors
+import com.example.ui.theme.appSecondaryText
+import com.example.ui.theme.appStarColor
 import com.example.ui.theme.appSubtleFill
+import com.example.ui.theme.appSuccessColor
+import com.example.ui.theme.AppBottomNavClearance
+import com.example.ui.theme.isCompactWidth
+import com.example.ui.theme.appSuccessContainer
+import com.example.ui.theme.appVideoAccentContainer
+import com.example.ui.theme.appVideoAccentColor
 import com.example.ui.theme.isAppDarkTheme
 
 data class TokenPlan(
@@ -147,21 +173,16 @@ fun UserProfileScreen(
     
     val pinkGradient = Brush.horizontalGradient(listOf(PinkPrimary, OrangeSecondary))
     
-    val textFieldColors = OutlinedTextFieldDefaults.colors(
-        focusedContainerColor = cardBg,
-        unfocusedContainerColor = cardBg,
-        disabledContainerColor = cardBg,
-        focusedBorderColor = PinkPrimary,
-        unfocusedBorderColor = borderColor,
-        focusedTextColor = textColor,
-        unfocusedTextColor = textColor
-    )
+    val textFieldColors = appOutlinedFieldColors()
+    val fallbackWallet = remember { mutableStateOf(Wallet()) }
+    val wallet by (viewModel?.walletState?.collectAsStateWithLifecycle() ?: fallbackWallet)
 
-    Box(modifier = Modifier.fillMaxSize().background(bg)) {
+    SoftScreenBackground {
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .verticalScroll(rememberScrollState()),
+                .verticalScroll(rememberScrollState())
+                .padding(bottom = AppBottomNavClearance),
         ) {
             // --- NEW PROFILE CARD (BASED ON SCREENSHOT) ---
         Box(
@@ -251,16 +272,13 @@ fun UserProfileScreen(
                 
                 Spacer(modifier = Modifier.height(24.dp))
                 
-                val walletState = viewModel?.walletState?.collectAsState()?.value
-                val tokenBalance = walletState?.balance ?: 500
-                
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceEvenly,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     ProfileStatItemV2("TOTAL CALLS", "0")
-                    ProfileStatItemV2("TOKENS", "$tokenBalance")
+                    ProfileStatItemV2("TOKENS", wallet.formattedBalanceFull())
                 }
             }
             
@@ -292,8 +310,7 @@ fun UserProfileScreen(
             if (selectedTab == 0) {
                 // Wallet Section
                 val context = LocalContext.current
-                val walletStateLocal = viewModel?.walletState?.collectAsState()?.value
-                val currentBalanceLocal = walletStateLocal?.balance ?: 1250
+                val compact = isCompactWidth()
                 val transactionsList = viewModel?.transactions?.collectAsState()?.value ?: emptyList()
 
                 // Available Tokens Card
@@ -311,13 +328,20 @@ fun UserProfileScreen(
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Column {
+                            Column(modifier = Modifier.weight(1f).padding(end = 8.dp)) {
                                 Text("Total Token Balance", color = appMutedText(), fontSize = 14.sp, fontWeight = FontWeight.Medium)
                                 Spacer(modifier = Modifier.height(6.dp))
                                 Row(verticalAlignment = Alignment.CenterVertically) {
                                     Icon(Icons.Default.MonetizationOn, contentDescription = "Tokens", tint = PinkPrimary, modifier = Modifier.size(24.dp))
                                     Spacer(modifier = Modifier.width(6.dp))
-                                    Text(String.format("%,d Tokens", currentBalanceLocal), color = textColor, fontSize = 24.sp, fontWeight = FontWeight.Bold)
+                                    Text(
+                                        "${wallet.formattedBalanceFull()} Tokens",
+                                        color = textColor,
+                                        fontSize = if (compact) 20.sp else 24.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
                                 }
                             }
                             
@@ -328,12 +352,14 @@ fun UserProfileScreen(
                                     .clickable {
                                         showTopUpOptionsDialog = true
                                     }
-                                    .padding(horizontal = 16.dp, vertical = 10.dp)
+                                    .padding(horizontal = if (compact) 10.dp else 16.dp, vertical = if (compact) 8.dp else 10.dp)
                             ) {
                                 Row(verticalAlignment = Alignment.CenterVertically) {
                                     Icon(Icons.Default.Add, contentDescription = "Add", tint = Color.White, modifier = Modifier.size(16.dp))
-                                    Spacer(modifier = Modifier.width(4.dp))
-                                    Text("Add Tokens", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                                    if (!compact) {
+                                        Spacer(modifier = Modifier.width(4.dp))
+                                        Text("Add Tokens", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                                    }
                                 }
                             }
                         }
@@ -362,7 +388,7 @@ fun UserProfileScreen(
                                 Spacer(modifier = Modifier.height(6.dp))
                                 Text("Audio Tokens", color = appMutedText(), fontSize = 12.sp, fontWeight = FontWeight.Medium)
                                 Spacer(modifier = Modifier.height(4.dp))
-                                Text("${walletStateLocal?.audioBalance ?: 750}", color = textColor, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                                Text("${wallet.audioBalance}", color = textColor, fontSize = 18.sp, fontWeight = FontWeight.Bold)
                             }
                             
                             Spacer(modifier = Modifier.width(16.dp))
@@ -383,7 +409,7 @@ fun UserProfileScreen(
                                 Spacer(modifier = Modifier.height(6.dp))
                                 Text("Video Tokens", color = appMutedText(), fontSize = 12.sp, fontWeight = FontWeight.Medium)
                                 Spacer(modifier = Modifier.height(4.dp))
-                                Text("${walletStateLocal?.videoBalance ?: 750}", color = textColor, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                                Text("${wallet.videoBalance}", color = textColor, fontSize = 18.sp, fontWeight = FontWeight.Bold)
                             }
                         }
                     }
@@ -421,7 +447,7 @@ fun UserProfileScreen(
                                     modifier = Modifier
                                         .size(10.dp)
                                         .clip(CircleShape)
-                                        .background(Color.Green)
+                                        .background(appSuccessColor())
                                 )
                                 Spacer(modifier = Modifier.width(8.dp))
                                 Text("Gold Subscription", color = PinkPrimary, fontSize = 18.sp, fontWeight = FontWeight.Bold)
@@ -437,9 +463,9 @@ fun UserProfileScreen(
                 
                 // Beautiful Promo Card to visit the separate Token Store
                 val promoGradient = if (isAppDarkTheme()) {
-                    Brush.horizontalGradient(listOf(Color(0xFF321A30), Color(0xFF1E1735)))
-                } else {
                     Brush.horizontalGradient(DarkPromoGradients.welcome)
+                } else {
+                    Brush.horizontalGradient(LightPromoGradients.welcome)
                 }
                 Box(
                     modifier = Modifier
@@ -448,52 +474,57 @@ fun UserProfileScreen(
                         .background(promoGradient)
                         .border(1.dp, PinkPrimary.copy(alpha = 0.5f), RoundedCornerShape(20.dp))
                         .clickable { onViewPackages?.invoke("All") }
-                        .padding(20.dp)
+                        .padding(horizontal = 20.dp, vertical = 18.dp)
                 ) {
-                    Column {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
+                    Column(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
                             Icon(
-                                Icons.Default.MonetizationOn, 
-                                contentDescription = "Token Store", 
-                                tint = Color(0xFFFFB800), 
+                                Icons.Default.MonetizationOn,
+                                contentDescription = "Token Store",
+                                tint = Color(0xFFFFB800),
                                 modifier = Modifier.size(24.dp)
                             )
-                            Spacer(modifier = Modifier.width(8.dp))
+                            Spacer(modifier = Modifier.width(10.dp))
                             Text(
-                                "Instant Token Packs Available!", 
-                                color = Color.White, 
-                                fontSize = 16.sp, 
+                                text = "Instant Token Packs Available!",
+                                color = if (isAppDarkTheme()) Color.White else LightOnSurface,
+                                fontSize = 16.sp,
+                                fontWeight = FontWeight.Bold,
+                                lineHeight = 20.sp,
+                                modifier = Modifier.weight(1f)
+                            )
+                        }
+                        Text(
+                            text = "Tap here to browse all Audio & Video token packages. Get customized packages, discount minutes, and HD streaming credits fully detailed in our Store.",
+                            color = appSecondaryText(),
+                            fontSize = 13.sp,
+                            lineHeight = 18.sp,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                        Box(
+                            modifier = Modifier
+                                .align(Alignment.End)
+                                .clip(RoundedCornerShape(12.dp))
+                                .background(pinkGradient)
+                                .padding(horizontal = 16.dp, vertical = 10.dp)
+                        ) {
+                            Text(
+                                text = "Browse Packages 📦",
+                                color = Color.White,
+                                fontSize = 12.sp,
                                 fontWeight = FontWeight.Bold
                             )
                         }
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Text(
-                            "Tap here to browse all Audio & Video token packages. Get customized packages, discount minutes, and HD streaming credits fully detailed in our Store.",
-                            color = Color.LightGray,
-                            fontSize = 13.sp,
-                            lineHeight = 18.sp
-                        )
-                        Spacer(modifier = Modifier.height(16.dp))
-                        Button(
-                            onClick = { onViewPackages?.invoke("All") },
-                            modifier = Modifier.align(Alignment.End).height(40.dp),
-                            colors = ButtonDefaults.buttonColors(containerColor = Color.Transparent),
-                            contentPadding = PaddingValues(0.dp),
-                            shape = RoundedCornerShape(12.dp)
-                        ) {
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxSize()
-                                    .background(pinkGradient)
-                                    .padding(horizontal = 16.dp),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Text("Browse Packages 📦", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                            }
-                        }
                     }
                 }
-                
+
+                Spacer(modifier = Modifier.height(24.dp))
                 // Section of Transactions at the Bottom
                 Row(
                     modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp),
@@ -543,33 +574,42 @@ fun UserProfileScreen(
                                 horizontalArrangement = Arrangement.SpaceBetween,
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
                                     Box(
                                         modifier = Modifier
                                             .size(36.dp)
                                             .clip(CircleShape)
-                                            .background(if (tx.isPositive) Color(0xFF1B3D2F) else Color(0xFF3D1B24)),
+                                            .background(if (tx.isPositive) appSuccessContainer() else appErrorContainer()),
                                         contentAlignment = Alignment.Center
                                     ) {
                                         Icon(
                                             imageVector = Icons.Default.MonetizationOn,
                                             contentDescription = "Token Tx",
-                                            tint = if (tx.isPositive) Color(0xFF3DDC84) else Color(0xFFFF4D4D),
+                                            tint = if (tx.isPositive) appSuccessColor() else appErrorColor(),
                                             modifier = Modifier.size(18.dp)
                                         )
                                     }
                                     Spacer(modifier = Modifier.width(12.dp))
-                                    Column {
-                                        Text(tx.title, color = textColor, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(
+                                            tx.title,
+                                            color = textColor,
+                                            fontSize = 14.sp,
+                                            fontWeight = FontWeight.SemiBold,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
                                         Spacer(modifier = Modifier.height(4.dp))
-                                        Text(tx.date, color = appMutedText(), fontSize = 11.sp)
+                                        Text(tx.date, color = appMutedText(), fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
                                     }
                                 }
+                                Spacer(modifier = Modifier.width(8.dp))
                                 Text(
                                     text = tx.amount,
-                                    color = if (tx.isPositive) Color(0xFF3DDC84) else Color(0xFFFF4D4D),
+                                    color = if (tx.isPositive) appSuccessColor() else appErrorColor(),
                                     fontSize = 14.sp,
-                                    fontWeight = FontWeight.Bold
+                                    fontWeight = FontWeight.Bold,
+                                    maxLines = 1
                                 )
                             }
                         }
@@ -583,38 +623,38 @@ fun UserProfileScreen(
                     AlertDialog(
                         onDismissRequest = { showCurrentPlanDetails = false },
                         title = {
-                            Text("Active Plan Membership", color = Color.White, fontWeight = FontWeight.Bold)
+                            Text("Active Plan Membership", color = textColor, fontWeight = FontWeight.Bold)
                         },
                         text = {
                             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                                    Text("Plan Name:", color = Color.Gray, fontSize = 14.sp)
+                                    Text("Plan Name:", color = appSecondaryText(), fontSize = 14.sp)
                                     Text("Gold Subscription", color = PinkPrimary, fontSize = 14.sp, fontWeight = FontWeight.Bold)
                                 }
                                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                                    Text("Tokens Included:", color = Color.Gray, fontSize = 14.sp)
-                                    Text("1,250 Tokens / Cycle", color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                                    Text("Tokens Included:", color = appSecondaryText(), fontSize = 14.sp)
+                                    Text("1,250 Tokens / Cycle", color = textColor, fontSize = 14.sp, fontWeight = FontWeight.Bold)
                                 }
                                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                                    Text("Cost & Billing:", color = Color.Gray, fontSize = 14.sp)
-                                    Text("$49.99 / Billed Monthly", color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                                    Text("Cost & Billing:", color = appSecondaryText(), fontSize = 14.sp)
+                                    Text("$49.99 / Billed Monthly", color = textColor, fontSize = 14.sp, fontWeight = FontWeight.Bold)
                                 }
                                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                                    Text("Purchase Date:", color = Color.Gray, fontSize = 14.sp)
-                                    Text("10 Jun 2026, 09:30 AM", color = Color.White, fontSize = 14.sp)
+                                    Text("Purchase Date:", color = appSecondaryText(), fontSize = 14.sp)
+                                    Text("10 Jun 2026, 09:30 AM", color = textColor, fontSize = 14.sp)
                                 }
                                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                                    Text("Renewal Date:", color = Color.Gray, fontSize = 14.sp)
-                                    Text("10 Jul 2026", color = Color.White, fontSize = 14.sp)
+                                    Text("Renewal Date:", color = appSecondaryText(), fontSize = 14.sp)
+                                    Text("10 Jul 2026", color = textColor, fontSize = 14.sp)
                                 }
                                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                                    Text("Payment Method:", color = Color.Gray, fontSize = 14.sp)
-                                    Text("Visa ending in 8492", color = Color.White, fontSize = 14.sp)
+                                    Text("Payment Method:", color = appSecondaryText(), fontSize = 14.sp)
+                                    Text("Visa ending in 8492", color = textColor, fontSize = 14.sp)
                                 }
                                 HorizontalDivider(color = borderColor)
                                 Text(
                                     text = "Benefits Included:\n• Unlocked VIP badge next to your profile picture\n• Priority video and audio streaming routing\n• Double daily bonus login rewards",
-                                    color = Color.LightGray,
+                                    color = appSecondaryText(),
                                     fontSize = 12.sp,
                                     lineHeight = 16.sp
                                 )
@@ -634,12 +674,12 @@ fun UserProfileScreen(
                     AlertDialog(
                         onDismissRequest = { showPurchaseConfirmDialog = null },
                         title = {
-                            Text("Confirm Token Purchase", color = Color.White, fontWeight = FontWeight.Bold)
+                            Text("Confirm Token Purchase", color = textColor, fontWeight = FontWeight.Bold)
                         },
                         text = {
                             Text(
                                 text = "Would you like to buy '${plan.title}' for ${plan.price}? This will immediately credit ${plan.tokens} ${if (plan.isVideo) "Video" else "Audio"} Tokens to your available balance.",
-                                color = Color.LightGray,
+                                color = appSecondaryText(),
                                 fontSize = 14.sp
                             )
                         },
@@ -651,12 +691,12 @@ fun UserProfileScreen(
                                     showPurchaseConfirmDialog = null
                                 }
                             ) {
-                                Text("Purchase", color = Color.Green, fontWeight = FontWeight.Bold)
+                                Text("Purchase", color = appSuccessColor(), fontWeight = FontWeight.Bold)
                             }
                         },
                         dismissButton = {
                             TextButton(onClick = { showPurchaseConfirmDialog = null }) {
-                                Text("Cancel", color = Color.Gray)
+                                Text("Cancel", color = appSecondaryText())
                             }
                         },
                         containerColor = cardBg
@@ -668,11 +708,11 @@ fun UserProfileScreen(
                     AlertDialog(
                         onDismissRequest = { showTopUpOptionsDialog = false },
                         title = {
-                            Text("Top Up Your Tokens", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 18.sp)
+                            Text("Top Up Your Tokens", color = textColor, fontWeight = FontWeight.Bold, fontSize = 18.sp)
                         },
                         text = {
                             Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
-                                Text("Select the token type to package and recharge. Audio and Video call tokens are split to provide optimized billing rates.", color = Color.LightGray, fontSize = 13.sp)
+                                Text("Select the token type to package and recharge. Audio and Video call tokens are split to provide optimized billing rates.", color = appSecondaryText(), fontSize = 13.sp)
                                 
                                 // Option A: Audio Tokens Top Up
                                 Row(
@@ -692,20 +732,20 @@ fun UserProfileScreen(
                                         modifier = Modifier
                                             .size(36.dp)
                                             .clip(CircleShape)
-                                            .background(Color(0xFF1B3D2F)),
+                                            .background(appSuccessContainer()),
                                         contentAlignment = Alignment.Center
                                     ) {
                                         Icon(
                                             imageVector = Icons.Default.Phone,
                                             contentDescription = "Audio Calls",
-                                            tint = Color(0xFF3DDC84),
+                                            tint = appSuccessColor(),
                                             modifier = Modifier.size(18.dp)
                                         )
                                     }
                                     Spacer(modifier = Modifier.width(12.dp))
                                     Column {
-                                        Text("Top Up Audio Tokens", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 14.sp)
-                                        Text("Recharge credits optimized for voice calls", color = Color.Gray, fontSize = 11.sp)
+                                        Text("Top Up Audio Tokens", color = textColor, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                                        Text("Recharge credits optimized for voice calls", color = appCaptionText(), fontSize = 11.sp)
                                     }
                                 }
 
@@ -727,20 +767,20 @@ fun UserProfileScreen(
                                         modifier = Modifier
                                             .size(36.dp)
                                             .clip(CircleShape)
-                                            .background(Color(0xFF3D1B24)),
+                                            .background(appErrorContainer()),
                                         contentAlignment = Alignment.Center
                                     ) {
                                         Icon(
                                             imageVector = Icons.Default.Videocam,
                                             contentDescription = "Video Calls",
-                                            tint = Color(0xFFFF4D4D),
+                                            tint = appErrorColor(),
                                             modifier = Modifier.size(18.dp)
                                         )
                                     }
                                     Spacer(modifier = Modifier.width(12.dp))
                                     Column {
-                                        Text("Top Up Video Tokens", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 14.sp)
-                                        Text("Recharge credits optimized for video streams", color = Color.Gray, fontSize = 11.sp)
+                                        Text("Top Up Video Tokens", color = textColor, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                                        Text("Recharge credits optimized for video streams", color = appCaptionText(), fontSize = 11.sp)
                                     }
                                 }
                             }
@@ -759,34 +799,34 @@ fun UserProfileScreen(
                     AlertDialog(
                         onDismissRequest = { showTxDetailsDialog = null },
                         title = {
-                            Text("Transaction Details", color = Color.White, fontWeight = FontWeight.Bold)
+                            Text("Transaction Details", color = textColor, fontWeight = FontWeight.Bold)
                         },
                         text = {
                             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                                    Text("Transaction Title:", color = Color.Gray, fontSize = 14.sp)
-                                    Text(tx.title, color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                                    Text("Transaction Title:", color = appSecondaryText(), fontSize = 14.sp)
+                                    Text(tx.title, color = textColor, fontSize = 14.sp, fontWeight = FontWeight.Bold)
                                 }
                                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                                    Text("Status:", color = Color.Gray, fontSize = 14.sp)
-                                    Text("Completed Successfully", color = Color.Green, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                                    Text("Status:", color = appSecondaryText(), fontSize = 14.sp)
+                                    Text("Completed Successfully", color = appSuccessColor(), fontSize = 14.sp, fontWeight = FontWeight.Bold)
                                 }
                                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                                    Text("Date & Time:", color = Color.Gray, fontSize = 14.sp)
-                                    Text(tx.date, color = Color.White, fontSize = 14.sp)
+                                    Text("Date & Time:", color = appSecondaryText(), fontSize = 14.sp)
+                                    Text(tx.date, color = textColor, fontSize = 14.sp)
                                 }
                                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                                    Text("Impact Amount:", color = Color.Gray, fontSize = 14.sp)
+                                    Text("Impact Amount:", color = appSecondaryText(), fontSize = 14.sp)
                                     Text(
                                         text = tx.amount,
-                                        color = if (tx.isPositive) Color(0xFF3DDC84) else Color(0xFFFF4D4D),
+                                        color = if (tx.isPositive) appSuccessColor() else appErrorColor(),
                                         fontSize = 14.sp,
                                         fontWeight = FontWeight.Bold
                                     )
                                 }
                                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                                    Text("Ref ID:", color = Color.Gray, fontSize = 14.sp)
-                                    Text(tx.id, color = Color.Gray, fontSize = 12.sp)
+                                    Text("Ref ID:", color = appSecondaryText(), fontSize = 14.sp)
+                                    Text(tx.id, color = appMutedText(), fontSize = 12.sp)
                                 }
                             }
                         },
@@ -813,7 +853,7 @@ fun UserProfileScreen(
                         value = uniqueId,
                         onValueChange = {},
                         readOnly = true,
-                        label = { Text("App Unique ID (System Assigned)", color = Color.Gray) },
+                        label = { Text("App Unique ID (System Assigned)", color = appCaptionText()) },
                         leadingIcon = { Icon(Icons.Default.Tag, contentDescription = "ID", tint = PinkPrimary) },
                         modifier = Modifier.fillMaxWidth(),
                         colors = OutlinedTextFieldDefaults.colors(
@@ -822,8 +862,8 @@ fun UserProfileScreen(
                             disabledContainerColor = cardBg,
                             focusedBorderColor = borderColor,
                             unfocusedBorderColor = borderColor,
-                            focusedTextColor = Color.Gray,
-                            unfocusedTextColor = Color.Gray
+                            focusedTextColor = appMutedText(),
+                            unfocusedTextColor = appMutedText()
                         ),
                         shape = RoundedCornerShape(12.dp)
                     )
@@ -837,7 +877,7 @@ fun UserProfileScreen(
                             tempFullName = it
                             if (it.isNotBlank()) fullNameError = null
                         },
-                        label = { Text("Full Name", color = Color.Gray) },
+                        label = { Text("Full Name", color = appCaptionText()) },
                         leadingIcon = { Icon(Icons.Default.Badge, contentDescription = "Full Name", tint = PinkPrimary) },
                         modifier = Modifier.fillMaxWidth(),
                         colors = textFieldColors,
@@ -855,7 +895,7 @@ fun UserProfileScreen(
                             tempUsername = it
                             if (it.isNotBlank()) usernameError = null
                         },
-                        label = { Text("Username", color = Color.Gray) },
+                        label = { Text("Username", color = appCaptionText()) },
                         leadingIcon = { Icon(Icons.Default.Person, contentDescription = "Username", tint = PinkPrimary) },
                         modifier = Modifier.fillMaxWidth(),
                         colors = textFieldColors,
@@ -874,7 +914,7 @@ fun UserProfileScreen(
                             tempPhone = it
                             if (it.isNotBlank()) phoneError = null
                         },
-                        label = { Text("Phone Number", color = Color.Gray) },
+                        label = { Text("Phone Number", color = appCaptionText()) },
                         leadingIcon = { Icon(Icons.Default.Phone, contentDescription = "Phone", tint = PinkPrimary) },
                         modifier = Modifier.fillMaxWidth(),
                         colors = textFieldColors,
@@ -892,7 +932,7 @@ fun UserProfileScreen(
                             tempLocation = it
                             if (it.isNotBlank()) locationError = null
                         },
-                        label = { Text("Location", color = Color.Gray) },
+                        label = { Text("Location", color = appCaptionText()) },
                         leadingIcon = { Icon(Icons.Default.LocationOn, contentDescription = "Location", tint = PinkPrimary) },
                         modifier = Modifier.fillMaxWidth(),
                         colors = textFieldColors,
@@ -913,7 +953,7 @@ fun UserProfileScreen(
                                 value = tempGender,
                                 onValueChange = {},
                                 readOnly = true,
-                                label = { Text("Gender", color = Color.Gray) },
+                                label = { Text("Gender", color = appCaptionText()) },
                                 modifier = Modifier.menuAnchor().fillMaxWidth(),
                                 trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = genderExpanded) },
                                 colors = textFieldColors,
@@ -941,7 +981,7 @@ fun UserProfileScreen(
                                 tempAge = it
                                 if (it.isNotBlank() && it.toIntOrNull() != null) ageError = null
                             },
-                            label = { Text("Age", color = Color.Gray) },
+                            label = { Text("Age", color = appCaptionText()) },
                             modifier = Modifier.weight(1f),
                             colors = textFieldColors,
                             shape = RoundedCornerShape(12.dp),
@@ -961,7 +1001,7 @@ fun UserProfileScreen(
                             value = tempLanguage,
                             onValueChange = {},
                             readOnly = true,
-                            label = { Text("Language", color = Color.Gray) },
+                            label = { Text("Language", color = appCaptionText()) },
                             modifier = Modifier.menuAnchor().fillMaxWidth(),
                             trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = languageExpanded) },
                             colors = textFieldColors,
@@ -987,7 +1027,7 @@ fun UserProfileScreen(
 
                     Text(
                         text = "Interests & Hobbies (Select Multiple)",
-                        color = Color.White,
+                        color = textColor,
                         fontSize = 14.sp,
                         fontWeight = FontWeight.Bold,
                         modifier = Modifier.padding(bottom = 8.dp)
@@ -1026,7 +1066,7 @@ fun UserProfileScreen(
                                     ) {
                                         Text(
                                             text = interest,
-                                            color = if (isSelected) PinkPrimary else Color.White,
+                                            color = if (isSelected) PinkPrimary else textColor,
                                             fontSize = 12.sp,
                                             fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
                                         )
@@ -1046,7 +1086,7 @@ fun UserProfileScreen(
                     OutlinedTextField(
                         value = tempBio,
                         onValueChange = { tempBio = it },
-                        label = { Text("Bio", color = Color.Gray) },
+                        label = { Text("Bio", color = appCaptionText()) },
                         modifier = Modifier.fillMaxWidth().height(120.dp),
                         colors = textFieldColors,
                         shape = RoundedCornerShape(12.dp),
@@ -1129,7 +1169,7 @@ fun UserProfileScreen(
                 val favorites = viewModel?.favorites?.collectAsState()?.value ?: emptySet()
                 if (favorites.isEmpty()) {
                     Box(modifier = Modifier.fillMaxWidth().height(200.dp), contentAlignment = Alignment.Center) {
-                        Text("No saved favorites yet.", color = Color.Gray, fontSize = 16.sp)
+                        Text("No saved favorites yet.", color = appMutedText(), fontSize = 16.sp)
                     }
                 } else {
                     val models = viewModel?.models?.collectAsState()?.value ?: emptyList()
@@ -1155,15 +1195,15 @@ fun UserProfileScreen(
                                 )
                                 Spacer(modifier = Modifier.width(16.dp))
                                 Column(modifier = Modifier.weight(1f)) {
-                                    Text(model.name, color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                                    Text(model.publicUsername(), color = textColor, fontSize = 18.sp, fontWeight = FontWeight.Bold)
                                     Row(verticalAlignment = Alignment.CenterVertically) {
-                                        Icon(Icons.Default.Star, contentDescription = "Rating", tint = Color(0xFFFFD700), modifier = Modifier.size(13.dp))
+                                        Icon(Icons.Default.Star, contentDescription = "Rating", tint = appStarColor(), modifier = Modifier.size(13.dp))
                                         Spacer(modifier = Modifier.width(3.dp))
-                                        Text(String.format("%.1f", model.rating), color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold)
-                                        Text(" (${model.reviewsCount})", color = Color.LightGray, fontSize = 12.sp)
+                                        Text(String.format("%.1f", model.rating), color = textColor, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                                        Text(" (${model.reviewsCount})", color = appSecondaryText(), fontSize = 12.sp)
                                     }
                                     Spacer(modifier = Modifier.height(2.dp))
-                                    Text(model.categories.firstOrNull() ?: "", color = Color.LightGray, fontSize = 14.sp)
+                                    Text(model.categories.firstOrNull() ?: "", color = appSecondaryText(), fontSize = 14.sp)
                                 }
                                 IconButton(onClick = { viewModel?.toggleFavorite(model.id) }) {
                                     Icon(Icons.Default.Favorite, contentDescription = "Remove Favorite", tint = PinkPrimary)
@@ -1171,41 +1211,6 @@ fun UserProfileScreen(
                             }
                         }
                     }
-                }
-            }
-            
-            if (selectedTab == 2) {
-                Spacer(modifier = Modifier.height(32.dp))
-                val context = LocalContext.current
-                var showLogOutAtProfileConfirm by remember { mutableStateOf(false) }
-                
-                OutlinedButton(
-                    onClick = { showLogOutAtProfileConfirm = true },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(56.dp)
-                        .padding(bottom = 8.dp),
-                    shape = RoundedCornerShape(16.dp),
-                    colors = ButtonDefaults.outlinedButtonColors(
-                        contentColor = PinkPrimary
-                    ),
-                    border = androidx.compose.foundation.BorderStroke(1.dp, PinkPrimary.copy(alpha = 0.5f))
-                ) {
-                    Icon(Icons.Default.Logout, contentDescription = "Logout")
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text("Logout", fontSize = 16.sp, fontWeight = FontWeight.Bold)
-                }
-
-                if (showLogOutAtProfileConfirm) {
-                    ConfirmDialog(
-                        title = "Log Out",
-                        text = "Are you sure you want to log out?",
-                        confirmText = "Log Out",
-                        onConfirm = {
-                            Toast.makeText(context, "Logged Out Successfully", Toast.LENGTH_SHORT).show()
-                        },
-                        onDismiss = { showLogOutAtProfileConfirm = false }
-                    )
                 }
             }
         }
@@ -1218,7 +1223,7 @@ fun ProfileStatItem(value: String, label: String) {
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
         Text(value, color = Color.White, fontSize = 20.sp, fontWeight = FontWeight.Bold)
         Spacer(modifier = Modifier.height(4.dp))
-        Text(label, color = Color.Gray, fontSize = 12.sp)
+        Text(label, color = Color.White.copy(alpha = 0.8f), fontSize = 12.sp)
     }
 }
 
@@ -1245,7 +1250,10 @@ fun ProfileDetailItem(icon: androidx.compose.ui.graphics.vector.ImageVector, tit
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
+        Row(
+            modifier = Modifier.weight(1f, fill = false),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
             Box(
                 modifier = Modifier
                     .size(40.dp)
@@ -1255,10 +1263,25 @@ fun ProfileDetailItem(icon: androidx.compose.ui.graphics.vector.ImageVector, tit
                 Icon(icon, contentDescription = title, tint = textColor, modifier = Modifier.size(20.dp))
             }
             Spacer(modifier = Modifier.width(16.dp))
-            Text(title, color = textColor, fontSize = 16.sp, fontWeight = FontWeight.Medium)
+            Text(
+                title,
+                color = textColor,
+                fontSize = 16.sp,
+                fontWeight = FontWeight.Medium,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
         }
+        Spacer(modifier = Modifier.width(8.dp))
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(value, color = textColor.copy(alpha = 0.6f), fontSize = 14.sp)
+            Text(
+                value,
+                color = textColor.copy(alpha = 0.6f),
+                fontSize = 14.sp,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f, fill = false)
+            )
             Spacer(modifier = Modifier.width(8.dp))
             Icon(Icons.Default.ChevronRight, contentDescription = "Arrow", tint = textColor.copy(alpha = 0.6f))
         }
@@ -1279,15 +1302,7 @@ fun SettingsScreen(
     
     val pinkGradient = Brush.horizontalGradient(listOf(PinkPrimary, OrangeSecondary))
 
-    val textFieldColors = OutlinedTextFieldDefaults.colors(
-        focusedTextColor = textColor,
-        unfocusedTextColor = textColor,
-        focusedContainerColor = cardBg,
-        unfocusedContainerColor = cardBg,
-        focusedBorderColor = PinkPrimary,
-        unfocusedBorderColor = borderColor,
-        cursorColor = PinkPrimary
-    )
+    val textFieldColors = appOutlinedFieldColors()
 
     val isDarkMode by (viewModel?.isDarkMode?.collectAsState() ?: remember { mutableStateOf(true) })
 
@@ -1305,8 +1320,6 @@ fun SettingsScreen(
     var showLogOutConfirm by remember { mutableStateOf(false) }
     var showDeleteConfirm by remember { mutableStateOf(false) }
 
-    var simFriendNameSetting by remember { mutableStateOf("") }
-    var simPromoCodeSetting by remember(myPromoCode) { mutableStateOf(myPromoCode) }
     var redeemCodeFieldSetting by remember { mutableStateOf("") }
 
     when (subScreen) {
@@ -1333,10 +1346,10 @@ fun SettingsScreen(
         SettingsSubScreen.Main -> Unit
     }
 
+    SoftScreenBackground {
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(bg)
             .verticalScroll(rememberScrollState())
             .padding(16.dp)
     ) {
@@ -1433,7 +1446,7 @@ fun SettingsScreen(
             Column(modifier = Modifier.padding(16.dp)) {
                 Text(
                     text = "Share the joy! Invite friends to join and get free rewards. For each friend who uses your invite code, both of you will receive 100 free bonus tokens!",
-                    color = Color.LightGray,
+                    color = appSecondaryText(),
                     fontSize = 13.sp,
                     lineHeight = 18.sp
                 )
@@ -1443,7 +1456,7 @@ fun SettingsScreen(
                 // Big Clear Invite Code Box
                 Text(
                     text = "YOUR REWARDS CODE:",
-                    color = Color.Gray,
+                    color = appCaptionText(),
                     fontSize = 11.sp,
                     fontWeight = FontWeight.Bold,
                     letterSpacing = 1.sp
@@ -1455,7 +1468,7 @@ fun SettingsScreen(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .background(Color(0xFF2A2836).copy(alpha = 0.5f), RoundedCornerShape(12.dp))
+                        .background(appInsetSurface(), RoundedCornerShape(12.dp))
                         .border(1.dp, PinkPrimary, RoundedCornerShape(12.dp))
                         .padding(horizontal = 14.dp, vertical = 10.dp),
                     horizontalArrangement = Arrangement.SpaceBetween,
@@ -1463,7 +1476,7 @@ fun SettingsScreen(
                 ) {
                     Text(
                         text = myPromoCode,
-                        color = Color.White,
+                        color = textColor,
                         fontSize = 16.sp,
                         fontWeight = FontWeight.Bold,
                         modifier = Modifier.testTag("referral_settings_code_text")
@@ -1495,8 +1508,8 @@ fun SettingsScreen(
                     Column(
                         modifier = Modifier
                             .weight(1f)
-                            .background(Color(0xFF2A2836).copy(alpha = 0.3f), RoundedCornerShape(12.dp))
-                            .border(1.dp, Color(0xFF2A2836), RoundedCornerShape(12.dp))
+                            .background(appInsetSurface(), RoundedCornerShape(12.dp))
+                            .border(1.dp, appInsetSurfaceBorder(), RoundedCornerShape(12.dp))
                             .padding(12.dp),
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
@@ -1510,7 +1523,7 @@ fun SettingsScreen(
                         Spacer(modifier = Modifier.height(4.dp))
                         Text(
                             text = "My Referrals",
-                            color = Color.Gray,
+                            color = appCaptionText(),
                             fontSize = 11.sp,
                             fontWeight = FontWeight.Medium
                         )
@@ -1520,14 +1533,14 @@ fun SettingsScreen(
                     Column(
                         modifier = Modifier
                             .weight(1f)
-                            .background(Color(0xFF2A2836).copy(alpha = 0.3f), RoundedCornerShape(12.dp))
-                            .border(1.dp, Color(0xFF2A2836), RoundedCornerShape(12.dp))
+                            .background(appInsetSurface(), RoundedCornerShape(12.dp))
+                            .border(1.dp, appInsetSurfaceBorder(), RoundedCornerShape(12.dp))
                             .padding(12.dp),
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
                         Text(
                             text = "${referredUsers.size * 100} Tokens",
-                            color = Color(0xFFFFD700),
+                            color = appStarColor(),
                             fontSize = 20.sp,
                             fontWeight = FontWeight.Bold,
                             modifier = Modifier.testTag("referral_settings_bonus_tokens_text")
@@ -1535,7 +1548,7 @@ fun SettingsScreen(
                         Spacer(modifier = Modifier.height(4.dp))
                         Text(
                             text = "Reward Tokens",
-                            color = Color.Gray,
+                            color = appCaptionText(),
                             fontSize = 11.sp,
                             fontWeight = FontWeight.Medium
                         )
@@ -1549,7 +1562,7 @@ fun SettingsScreen(
                 // Redeem a friend's code section
                 Text(
                     text = "REDEEM AN INVITE CODE:",
-                    color = Color.Gray,
+                    color = appCaptionText(),
                     fontSize = 11.sp,
                     fontWeight = FontWeight.Bold,
                     letterSpacing = 1.sp
@@ -1561,10 +1574,10 @@ fun SettingsScreen(
                         modifier = Modifier
                             .fillMaxWidth()
                             .clip(RoundedCornerShape(10.dp))
-                            .background(Color(0xFF1B3D2F))
+                            .background(appSuccessContainer())
                             .padding(10.dp)
                     ) {
-                        Text("✓ You have successfully redeemed a code and earned +100 tokens!", color = Color(0xFF3DDC84), fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                        Text("✓ You have successfully redeemed a code and earned +100 tokens!", color = appSuccessColor(), fontSize = 11.sp, fontWeight = FontWeight.Bold)
                     }
                 } else {
                     Row(
@@ -1575,7 +1588,7 @@ fun SettingsScreen(
                         OutlinedTextField(
                             value = redeemCodeFieldSetting,
                             onValueChange = { redeemCodeFieldSetting = it },
-                            placeholder = { Text("e.g. VIP-FRIEND-123", fontSize = 12.sp, color = Color.Gray) },
+                            placeholder = { Text("e.g. VIP-FRIEND-123", fontSize = 12.sp, color = appCaptionText()) },
                             singleLine = true,
                             colors = textFieldColors,
                             modifier = Modifier
@@ -1613,91 +1626,6 @@ fun SettingsScreen(
                         }
                     }
                 }
-                
-                Spacer(modifier = Modifier.height(20.dp))
-                HorizontalDivider(color = borderColor)
-                Spacer(modifier = Modifier.height(16.dp))
-                
-                // SIMULATOR (Beautiful, clean, and highly automated for easy user registration testing)
-                Text(
-                    text = "DEMO & TEST ZONE:",
-                    color = Color.Gray,
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.Bold,
-                    letterSpacing = 1.sp
-                )
-                Spacer(modifier = Modifier.height(4.dp))
-                Text(
-                    text = "Test this feature instantly: enter a name below and click simulate to see your stats grow by +100 tokens as if a real friend signed up!",
-                    color = Color.Gray,
-                    fontSize = 11.sp,
-                    lineHeight = 15.sp
-                )
-                Spacer(modifier = Modifier.height(10.dp))
-                
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    OutlinedTextField(
-                        value = simFriendNameSetting,
-                        onValueChange = { simFriendNameSetting = it },
-                        placeholder = { Text("Friend's Username", fontSize = 12.sp, color = Color.Gray) },
-                        singleLine = true,
-                        colors = textFieldColors,
-                        modifier = Modifier
-                            .weight(1.3f)
-                            .height(46.dp)
-                            .testTag("sim_settings_friend_input")
-                    )
-                    
-                    OutlinedTextField(
-                        value = simPromoCodeSetting,
-                        onValueChange = { simPromoCodeSetting = it },
-                        placeholder = { Text("Code Used", fontSize = 12.sp, color = Color.Gray) },
-                        singleLine = true,
-                        colors = textFieldColors,
-                        modifier = Modifier
-                            .weight(1f)
-                            .height(46.dp)
-                            .testTag("sim_settings_code_input")
-                    )
-                }
-                
-                Spacer(modifier = Modifier.height(10.dp))
-                    Button(
-                        onClick = {
-                            if (simFriendNameSetting.isBlank()) {
-                                Toast.makeText(context, "Please enter a test friend's username.", Toast.LENGTH_SHORT).show()
-                            } else {
-                                val codeToUse = if (simPromoCodeSetting.isBlank()) myPromoCode else simPromoCodeSetting
-                                if (viewModel?.simulateFriendRegister(simFriendNameSetting, codeToUse) == true) {
-                                    Toast.makeText(context, "Mock Signup Success! @$simFriendNameSetting has registered with your code and you got +100 referral tokens!", Toast.LENGTH_LONG).show()
-                                    simFriendNameSetting = ""
-                                    simPromoCodeSetting = myPromoCode
-                                } else {
-                                    Toast.makeText(context, "Invalid Referral Code used inside demo. Make sure it matches your own code: $myPromoCode", Toast.LENGTH_SHORT).show()
-                                }
-                            }
-                        },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(46.dp)
-                            .testTag("sim_settings_action_btn"),
-                        colors = ButtonDefaults.buttonColors(containerColor = Color.Transparent),
-                        contentPadding = PaddingValues(0.dp),
-                        shape = RoundedCornerShape(12.dp)
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .background(pinkGradient),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text("Simulate Free Registration 🚀", color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Bold)
-                        }
-                    }
             }
         }
         
@@ -1745,6 +1673,7 @@ fun SettingsScreen(
             },
             onDismiss = { showDeleteConfirm = false }
         )
+    }
     }
 }
 
@@ -1863,32 +1792,28 @@ fun SimpleTextDialog(title: String, text: String, onDismiss: () -> Unit) {
 }
 
 @Composable
-fun ConfirmDialog(title: String, text: String, confirmText: String = "Confirm", onConfirm: () -> Unit, onDismiss: () -> Unit) {
-    val textColor = MaterialTheme.colorScheme.onSurface
-    val secondaryText = MaterialTheme.colorScheme.onSurfaceVariant
-    val cardBg = MaterialTheme.colorScheme.surface
+fun ConfirmDialog(
+    title: String,
+    text: String,
+    confirmText: String = "Confirm",
+    variant: AppDialogVariant? = null,
+    onConfirm: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    val resolvedVariant = variant ?: when {
+        title.equals("Log Out", ignoreCase = true) -> AppDialogVariant.Logout
+        title.contains("Delete", ignoreCase = true) -> AppDialogVariant.DeleteAccount
+        confirmText.equals("Block", ignoreCase = true) -> AppDialogVariant.Block
+        else -> AppDialogVariant.Default
+    }
 
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        shape = RoundedCornerShape(20.dp),
-        containerColor = cardBg,
-        title = {
-            Text(title, color = textColor, fontWeight = FontWeight.Bold, fontSize = 18.sp)
-        },
-        text = {
-            Text(text, color = secondaryText, fontSize = 14.sp, lineHeight = 22.sp)
-        },
-        confirmButton = {
-            TextButton(onClick = { onConfirm(); onDismiss() }) {
-                Text(confirmText, color = Color(0xFFFF4D4D), fontWeight = FontWeight.Bold)
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text("Cancel", color = secondaryText, fontWeight = FontWeight.Medium)
-            }
-        },
-        tonalElevation = 6.dp
+    AppActionDialog(
+        title = title,
+        message = text,
+        confirmText = confirmText,
+        variant = resolvedVariant,
+        onConfirm = onConfirm,
+        onDismiss = onDismiss
     )
 }
 
