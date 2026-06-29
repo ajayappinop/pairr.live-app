@@ -53,7 +53,7 @@ fun WalletScreen(viewModel: MainViewModel) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         Text("Current Balance", color = Color.White, style = MaterialTheme.typography.titleMedium)
                         Spacer(modifier = Modifier.height(8.dp))
-                        Text("${wallet.formattedBalanceFull()} Tokens", color = Color.White, fontSize = 36.sp, fontWeight = FontWeight.Bold)
+                        Text("${wallet.formattedBalanceFull()} Rupees", color = Color.White, fontSize = 36.sp, fontWeight = FontWeight.Bold)
                     }
                 }
             }
@@ -63,7 +63,7 @@ fun WalletScreen(viewModel: MainViewModel) {
             Text("Recharge Packages", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
             Spacer(modifier = Modifier.height(16.dp))
             
-            val packages = listOf(100 to "$5", 500 to "$20", 1200 to "$45")
+            val packages = listOf(100 to "₹5", 500 to "₹20", 1200 to "₹45")
             
             packages.forEach { (tokens, price) ->
                 Card(
@@ -80,9 +80,9 @@ fun WalletScreen(viewModel: MainViewModel) {
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Column {
-                            Text("$tokens Tokens", fontWeight = FontWeight.Bold, fontSize = 18.sp)
+                            Text("$tokens Rupees", fontWeight = FontWeight.Bold, fontSize = 18.sp)
                             if (tokens >= 500) {
-                                Text("+ Bonus Tokens", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
+                                Text("+ Bonus Rupees", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
                             }
                         }
                         Button(

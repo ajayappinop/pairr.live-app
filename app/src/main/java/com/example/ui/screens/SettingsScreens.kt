@@ -201,10 +201,10 @@ fun FaqScreen(onBack: () -> Unit) {
     val faqItems = remember {
         listOf(
             "How do I edit my profile?" to "Open the Profile tab, go to the Personal Info section, update your details, and tap Save Changes.",
-            "How do tokens work?" to "Audio and video calls use separate token balances. Buy packs from the Token Store or your profile wallet section.",
+            "How do rupees work?" to "Audio and video calls use separate rupee balances. Buy packs from the Rupee Store or your profile wallet section.",
             "How do I start a chat?" to "Open a model's profile and tap Chat, or go to the Chat tab to continue existing conversations.",
             "How do I block someone?" to "Open a user's or model's profile page and tap the block icon. Manage blocked accounts from Settings → Blocked Accounts.",
-            "How do referrals work?" to "Share your invite code from Settings. When a friend signs up with it, you both receive 100 bonus tokens.",
+            "How do referrals work?" to "Share your invite code from Settings. When a friend signs up with it, you both receive 100 bonus rupees.",
             "How do I report a problem?" to "Go to Settings → Report A Problem, pick a category, describe the issue, and submit. Our team will review it."
         )
     }
@@ -266,7 +266,7 @@ fun TermsOfServiceScreen(onBack: () -> Unit) {
         listOf(
             "1. Acceptance of Terms" to "By using Pairr, you agree to these terms and our community guidelines. If you do not agree, please discontinue use of the app.",
             "2. User Accounts" to "You are responsible for maintaining the confidentiality of your login credentials and for all activity under your account.",
-            "3. Tokens & Payments" to "Tokens are used for audio and video sessions. Purchases are final unless required by applicable law. Bonus tokens may expire.",
+            "3. Rupees & Payments" to "Rupees are used for audio and video sessions. Purchases are final unless required by applicable law. Bonus rupees may expire.",
             "4. Model Conduct" to "Models must provide accurate profile information, respect community standards, and honor published rates for calls.",
             "5. Privacy" to "We collect and use data as described in our privacy practices to operate chat, calls, payments, and safety features.",
             "6. Termination" to "We may suspend or terminate accounts that violate these terms. You may delete your account at any time from Settings."

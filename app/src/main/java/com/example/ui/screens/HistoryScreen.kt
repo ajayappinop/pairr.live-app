@@ -45,7 +45,7 @@ fun HistoryScreen() {
                             Text(info.date, style = MaterialTheme.typography.bodySmall)
                             Text("Duration: ${info.duration}", style = MaterialTheme.typography.bodySmall)
                         }
-                        Text("-${info.amountSpent} Tokens", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.error)
+                        Text("-${info.amountSpent} Rupees", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.error)
                     }
                 }
             }

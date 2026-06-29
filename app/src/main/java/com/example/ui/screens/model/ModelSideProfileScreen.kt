@@ -28,7 +28,7 @@ import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Language
-import androidx.compose.material.icons.filled.MonetizationOn
+import androidx.compose.material.icons.filled.CurrencyRupee
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Notifications
@@ -48,7 +48,6 @@ import androidx.compose.material.icons.filled.VolumeUp
 import androidx.compose.material.icons.filled.Vibration
 import androidx.compose.material.icons.filled.Phone
 import androidx.compose.material.icons.filled.Email
-import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Tag
 import androidx.compose.material.icons.filled.Badge
 import androidx.compose.material.icons.filled.Videocam
@@ -74,13 +73,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
 import com.example.ModelCallEarning
 import com.example.ModelReview
-import com.example.data.displayImageUrls
 import com.example.data.displayProfilePhotoUrl
-import com.example.data.storedImageUrls
-import com.example.ui.components.FullScreenImageDialog
-import com.example.ui.components.ModelImageGridGallery
-import com.example.ui.components.ModelMediaUploadSection
-import com.example.ui.components.ModelProfileCardMediaBanner
+import com.example.ui.components.ModelProfilePhotoSection
 import com.example.ui.components.ModelRatePerMinuteRow
 import com.example.ui.screens.AllReviewsDialog
 import com.example.ui.theme.AppSegmentedTabs
@@ -130,17 +124,12 @@ fun ModelSideProfileScreen(
         .collectAsStateWithLifecycle()
 
     var email by remember { mutableStateOf("john.doe@example.com") }
-    var phone by rememberSaveable { mutableStateOf("+1 (555) 019-2834") }
-    var location by rememberSaveable { mutableStateOf("New York, USA") }
-    val uniqueId = remember { "UID-${(100000..999999).random()}" }
     var age by rememberSaveable { mutableStateOf("28") }
     var gender by rememberSaveable { mutableStateOf("Male") }
-    var bio by rememberSaveable { mutableStateOf("Hey there! I am using the app to explore custom matches.") }
+    var bio by rememberSaveable { mutableStateOf("") }
     var selectedLanguages by remember { mutableStateOf(setOf("English")) }
+    var selectedCategories by remember { mutableStateOf(setOf<String>()) }
     var profilePhotoUri by remember { mutableStateOf<Uri?>(null) }
-    
-    val availableCategories = listOf("Astrology", "Lifestyle", "Fashion", "Fitness", "Gaming", "Music", "Art")
-    var selectedCategories by remember { mutableStateOf(setOf("Astrology", "Lifestyle")) }
     
     var isSettingsShowing by remember { mutableStateOf(false) }
 
@@ -149,12 +138,12 @@ fun ModelSideProfileScreen(
     var showRatingDialog by remember { mutableStateOf(false) }
     var showReviewsDialog by remember { mutableStateOf(false) }
     var showEarningDetailsDialog by remember { mutableStateOf<ModelCallEarning?>(null) }
-    var selectedGalleryImage by remember { mutableStateOf<Pair<String, Int>?>(null) }
 
     val models by (viewModel?.models ?: kotlinx.coroutines.flow.MutableStateFlow(emptyList()))
         .collectAsStateWithLifecycle()
     val currentModel = models.find { it.id == viewModel?.getCurrentModelId() }
-    val galleryImages = currentModel?.storedImageUrls() ?: emptyList()
+    val registeredPhone = viewModel?.getCurrentUserPhoneDisplay().orEmpty()
+        .ifBlank { "+1 (555) 019-2834" }
     var showTopUpOptionsDialog by remember { mutableStateOf(false) }
     var selectedPlanFilter by remember { mutableStateOf("All") } // "All", "Audio", "Video"
 
@@ -165,8 +154,6 @@ fun ModelSideProfileScreen(
 
     var tempUsername by remember(savedUsername) { mutableStateOf(savedUsername) }
     var tempFullName by remember(savedFullName) { mutableStateOf(savedFullName) }
-    var tempPhone by remember { mutableStateOf(phone) }
-    var tempLocation by remember { mutableStateOf(location) }
     var tempAge by remember { mutableStateOf(age) }
     var tempGender by remember { mutableStateOf(gender) }
     var tempBio by remember { mutableStateOf(bio) }
@@ -178,17 +165,38 @@ fun ModelSideProfileScreen(
         tempFullName = savedFullName
     }
 
+    LaunchedEffect(currentModel?.id, currentModel?.bio, currentModel?.languages, currentModel?.categories) {
+        currentModel?.let { model ->
+            val defaultBio = "Hey there! I am using the app to explore custom matches."
+            if (bio.isBlank()) bio = model.bio.ifBlank { defaultBio }
+            tempBio = model.bio.ifBlank { defaultBio }
+            val langs = model.languages.takeIf { it.isNotEmpty() } ?: listOf("English")
+            selectedLanguages = langs.toSet()
+            tempSelectedLanguages = langs.toSet()
+            val cats = model.categories.toSet()
+            selectedCategories = cats
+            tempSelectedCategories = cats
+        }
+    }
+
     var usernameError by remember { mutableStateOf<String?>(null) }
     var fullNameError by remember { mutableStateOf<String?>(null) }
-    var phoneError by remember { mutableStateOf<String?>(null) }
-    var locationError by remember { mutableStateOf<String?>(null) }
     var ageError by remember { mutableStateOf<String?>(null) }
     
     var genderExpanded by remember { mutableStateOf(false) }
     val genders = listOf("Male", "Female", "Other", "Prefer not to say")
     
-    var languageExpanded by remember { mutableStateOf(false) }
-    val languages = listOf("English", "Spanish", "French", "German", "Hindi", "Japanese", "Chinese")
+    val languages = listOf(
+        "Hindi", "English", "Bengali",
+        "Telugu", "Marathi", "Tamil",
+        "Gujarati", "Kannada", "Malayalam",
+        "Punjabi", "Urdu", "Odia"
+    )
+    val talkCategories = listOf(
+        "Casual Talk", "Movies", "Music", "Advice", "Listening",
+        "Deep Talk", "Arts", "Gaming", "Travel", "Fitness",
+        "Relationships", "Career", "Spirituality", "Cooking", "Fashion"
+    )
 
     val context = LocalContext.current
 
@@ -199,28 +207,6 @@ fun ModelSideProfileScreen(
             profilePhotoUri = it
             viewModel?.setProfilePhotoForCurrentModel(it.toString())
             Toast.makeText(context, "Profile photo updated", Toast.LENGTH_SHORT).show()
-        }
-    }
-
-    val photoPicker = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.GetContent()
-    ) { uri: Uri? ->
-        uri?.let {
-            val added = viewModel?.addGalleryPhotoToCurrentModel(it.toString()) ?: false
-            Toast.makeText(
-                context,
-                if (added) "Photo added to your profile" else "Maximum 5 photos allowed",
-                Toast.LENGTH_SHORT
-            ).show()
-        }
-    }
-
-    val videoPicker = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.GetContent()
-    ) { uri: Uri? ->
-        uri?.let {
-            viewModel?.setIntroVideoForCurrentModel(it.toString())
-            Toast.makeText(context, "Intro video uploaded", Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -270,17 +256,6 @@ fun ModelSideProfileScreen(
                         .padding(bottom = 24.dp),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    currentModel?.let { model ->
-                        val bannerProfilePhoto = profilePhotoUri?.toString()
-                            ?: model.profilePhotoUrl
-                            ?: model.displayProfilePhotoUrl()
-                        ModelProfileCardMediaBanner(
-                            model = model,
-                            profilePhotoOverride = bannerProfilePhoto
-                        )
-                        Spacer(modifier = Modifier.height(12.dp))
-                    }
-
                     Box(modifier = Modifier.fillMaxWidth().padding(end = 16.dp, top = 16.dp), contentAlignment = Alignment.TopEnd) {
                         IconButton(
                             onClick = { isSettingsShowing = true },
@@ -299,59 +274,6 @@ fun ModelSideProfileScreen(
                         fontWeight = FontWeight.Bold
                     )
                     
-                    Spacer(modifier = Modifier.height(8.dp))
-                    
-                    Text(
-                        text = "ID : ${uniqueId.filter { it.isDigit() }.ifEmpty { "53878700" }}",
-                        color = secondaryTextColor,
-                        fontSize = 16.sp,
-                        fontWeight = FontWeight.Medium
-                    )
-                    
-                    Spacer(modifier = Modifier.height(14.dp))
-                    
-                    Box(
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(20.dp))
-                            .background(PinkPrimary.copy(alpha = 0.12f))
-                            .border(1.dp, PinkPrimary.copy(alpha = 0.35f), RoundedCornerShape(20.dp))
-                            .padding(horizontal = 20.dp, vertical = 6.dp)
-                    ) {
-                        Text(
-                            text = "Top Influencer",
-                            color = PinkPrimary,
-                            fontSize = 14.sp,
-                            fontWeight = FontWeight.Bold
-                        )
-                    }
-                    
-                    Spacer(modifier = Modifier.height(12.dp))
-
-                    val avgRating = viewModel?.getAverageRatingForCurrentModel() ?: 0f
-                    Text(
-                        text = "⭐ ${String.format("%.1f", avgRating)}",
-                        fontSize = 22.sp,
-                        color = textColor,
-                        fontWeight = FontWeight.Bold
-                    )
-
-                    if (galleryImages.isNotEmpty()) {
-                        Spacer(modifier = Modifier.height(16.dp))
-                        Text(
-                            "My Photos (${galleryImages.size}/5)",
-                            color = secondaryTextColor,
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            modifier = Modifier.padding(horizontal = 20.dp)
-                        )
-                        Spacer(modifier = Modifier.height(8.dp))
-                        ModelImageGridGallery(
-                            imageUrls = galleryImages,
-                            modifier = Modifier.padding(horizontal = 16.dp),
-                            onImageClick = { url, index -> selectedGalleryImage = url to index }
-                        )
-                    }
-
                     Spacer(modifier = Modifier.height(20.dp))
                     
                     HorizontalDivider(
@@ -378,7 +300,10 @@ fun ModelSideProfileScreen(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         ProfileStatItemV2("TOTAL CALLS", "1,250")
-                        ProfileStatItemV2("RATING", String.format("%.1f", viewModel?.getAverageRatingForCurrentModel() ?: 0f))
+                        ProfileStatItemV2(
+                            "RATING",
+                            String.format("%.1f", viewModel?.getAverageRatingForCurrentModel() ?: 0f)
+                        )
                     }
                 }
                 
@@ -404,11 +329,13 @@ fun ModelSideProfileScreen(
             
             Column(modifier = Modifier.padding(horizontal = 16.dp).padding(top = 10.dp)) {
                 AppSegmentedTabs(
-                    tabs = listOf("Payout", "Info", "Media", "Stats"),
+                    tabs = listOf("Payout", "Info", "Stats"),
                     selectedIndex = selectedTab,
                     onTabSelected = { selectedTab = it },
                     fontSize = 13.sp
                 )
+
+                Spacer(modifier = Modifier.height(20.dp))
             
             if (selectedTab == 0) {
                 // PAYOUT SECTION
@@ -607,10 +534,10 @@ fun ModelSideProfileScreen(
     ) {
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
             Text("Available for Withdrawal", color = secondaryTextColor, fontSize = 14.sp)
-            Icon(Icons.Default.MonetizationOn, contentDescription = null, tint = PinkPrimary, modifier = Modifier.size(20.dp))
+            Icon(Icons.Default.CurrencyRupee, contentDescription = null, tint = PinkPrimary, modifier = Modifier.size(20.dp))
         }
         Spacer(modifier = Modifier.height(4.dp))
-        Text("$currentDailyEarn Tokens", color = textColor, fontSize = 36.sp, fontWeight = FontWeight.Bold)
+        Text("$currentDailyEarn Rupees", color = textColor, fontSize = 36.sp, fontWeight = FontWeight.Bold)
         Spacer(modifier = Modifier.height(16.dp))
         
         HorizontalDivider(color = borderColor)
@@ -618,12 +545,12 @@ fun ModelSideProfileScreen(
         
         Row(horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             Text("Monthly Earnings", color = secondaryTextColor, fontSize = 14.sp)
-            Text("$monthlyEarn Tokens", color = PinkPrimary, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+            Text("$monthlyEarn Rupees", color = PinkPrimary, fontSize = 16.sp, fontWeight = FontWeight.Bold)
         }
         Spacer(modifier = Modifier.height(12.dp))
         Row(horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             Text("Lifetime Earnings", color = secondaryTextColor, fontSize = 14.sp)
-            Text("$lifetimeEarn Tokens", color = textColor, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+            Text("$lifetimeEarn Rupees", color = textColor, fontSize = 16.sp, fontWeight = FontWeight.Bold)
         }
         
         Spacer(modifier = Modifier.height(24.dp))
@@ -652,6 +579,25 @@ fun ModelSideProfileScreen(
     }
                 
             } else if (selectedTab == 1) {
+                val mediaModel = currentModel ?: models.firstOrNull()
+                if (mediaModel != null) {
+                    ModelProfilePhotoSection(
+                        profilePhotoUrl = profilePhotoUri?.toString()
+                            ?: mediaModel.profilePhotoUrl?.takeIf { it.isNotBlank() },
+                        cardBg = cardBg,
+                        borderColor = borderColor,
+                        textColor = textColor,
+                        secondaryTextColor = secondaryTextColor,
+                        onChangePhoto = { profilePhotoPicker.launch("image/*") },
+                        onRemovePhoto = {
+                            profilePhotoUri = null
+                            viewModel?.clearProfilePhotoForCurrentModel()
+                            Toast.makeText(context, "Profile photo removed", Toast.LENGTH_SHORT).show()
+                        }
+                    )
+                    Spacer(modifier = Modifier.height(20.dp))
+                }
+
                 // Personal Info Section Form
                 Column(
                     modifier = Modifier
@@ -659,29 +605,6 @@ fun ModelSideProfileScreen(
                         .appSurfaceCard(shape = RoundedCornerShape(20.dp))
                         .padding(16.dp)
                 ) {
-                    // Unique App ID (Read-only)
-                    OutlinedTextField(
-                        value = uniqueId,
-                        onValueChange = {},
-                        readOnly = true,
-                        label = { Text("App Unique ID (System Assigned)") },
-                        leadingIcon = { Icon(Icons.Default.Tag, contentDescription = "ID", tint = PinkPrimary) },
-                        modifier = Modifier.fillMaxWidth(),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedContainerColor = cardBg,
-                            unfocusedContainerColor = cardBg,
-                            disabledContainerColor = cardBg,
-                            focusedBorderColor = borderColor,
-                            unfocusedBorderColor = borderColor,
-                            disabledTextColor = secondaryTextColor,
-                            focusedTextColor = secondaryTextColor,
-                            unfocusedTextColor = secondaryTextColor
-                        ),
-                        shape = RoundedCornerShape(12.dp)
-                    )
-
-                    Spacer(modifier = Modifier.height(16.dp))
-
                     // Full Name Field
                     OutlinedTextField(
                         value = tempFullName,
@@ -719,38 +642,25 @@ fun ModelSideProfileScreen(
                     Spacer(modifier = Modifier.height(16.dp))
 
 
-                    // Phone Number Field
+                    // Phone Number Field (read-only — tied to login)
                     OutlinedTextField(
-                        value = tempPhone,
-                        onValueChange = { 
-                            tempPhone = it
-                            if (it.isNotBlank()) phoneError = null
-                        },
+                        value = registeredPhone,
+                        onValueChange = {},
+                        readOnly = true,
                         label = { Text("Phone Number") },
                         leadingIcon = { Icon(Icons.Default.Phone, contentDescription = "Phone", tint = PinkPrimary) },
                         modifier = Modifier.fillMaxWidth(),
-                        colors = textFieldColors,
-                        shape = RoundedCornerShape(12.dp),
-                        isError = phoneError != null,
-                        supportingText = { phoneError?.let { Text(it, color = MaterialTheme.colorScheme.error) } }
-                    )
-
-                    Spacer(modifier = Modifier.height(16.dp))
-
-                    // Location Field
-                    OutlinedTextField(
-                        value = tempLocation,
-                        onValueChange = { 
-                            tempLocation = it
-                            if (it.isNotBlank()) locationError = null
-                        },
-                        label = { Text("Location") },
-                        leadingIcon = { Icon(Icons.Default.LocationOn, contentDescription = "Location", tint = PinkPrimary) },
-                        modifier = Modifier.fillMaxWidth(),
-                        colors = textFieldColors,
-                        shape = RoundedCornerShape(12.dp),
-                        isError = locationError != null,
-                        supportingText = { locationError?.let { Text(it, color = MaterialTheme.colorScheme.error) } }
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedContainerColor = cardBg,
+                            unfocusedContainerColor = cardBg,
+                            disabledContainerColor = cardBg,
+                            focusedBorderColor = borderColor,
+                            unfocusedBorderColor = borderColor,
+                            disabledTextColor = secondaryTextColor,
+                            focusedTextColor = secondaryTextColor,
+                            unfocusedTextColor = secondaryTextColor
+                        ),
+                        shape = RoundedCornerShape(12.dp)
                     )
 
                     Spacer(modifier = Modifier.height(16.dp))
@@ -806,7 +716,7 @@ fun ModelSideProfileScreen(
 
                     Text(
                         text = "Languages (Select Multiple)",
-                        color = Color.White,
+                        color = textColor,
                         fontSize = 14.sp,
                         fontWeight = FontWeight.Bold,
                         modifier = Modifier.padding(bottom = 8.dp)
@@ -819,8 +729,8 @@ fun ModelSideProfileScreen(
                             .background(cardBg)
                             .padding(12.dp)
                     ) {
-                        val chunks = languages.chunked(3)
-                        chunks.forEach { chunk ->
+                        val languageChunks = languages.chunked(3)
+                        languageChunks.forEach { chunk ->
                             Row(
                                 modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
                                 horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -831,7 +741,7 @@ fun ModelSideProfileScreen(
                                         modifier = Modifier
                                             .weight(1f)
                                             .clip(RoundedCornerShape(10.dp))
-                                            .background(if (isSelected) PinkPrimary.copy(alpha = 0.2f) else borderColor)
+                                            .background(if (isSelected) PinkPrimary.copy(alpha = 0.2f) else borderColor.copy(alpha = 0.35f))
                                             .border(1.dp, if (isSelected) PinkPrimary else Color.Transparent, RoundedCornerShape(10.dp))
                                             .clickable {
                                                 tempSelectedLanguages = if (isSelected) {
@@ -845,7 +755,7 @@ fun ModelSideProfileScreen(
                                     ) {
                                         Text(
                                             text = lang,
-                                            color = if (isSelected) PinkPrimary else Color.White,
+                                            color = if (isSelected) PinkPrimary else textColor,
                                             fontSize = 12.sp,
                                             fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
                                         )
@@ -859,12 +769,12 @@ fun ModelSideProfileScreen(
                             }
                         }
                     }
-                    
+
                     Spacer(modifier = Modifier.height(16.dp))
 
                     Text(
-                        text = "Categories (Select Multiple)",
-                        color = Color.White,
+                        text = "Topics (Select Multiple)",
+                        color = textColor,
                         fontSize = 14.sp,
                         fontWeight = FontWeight.Bold,
                         modifier = Modifier.padding(bottom = 8.dp)
@@ -877,35 +787,37 @@ fun ModelSideProfileScreen(
                             .background(cardBg)
                             .padding(12.dp)
                     ) {
-                        val chunks = availableCategories.chunked(3)
-                        chunks.forEach { chunk ->
+                        val categoryChunks = talkCategories.chunked(3)
+                        categoryChunks.forEach { chunk ->
                             Row(
                                 modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
                                 horizontalArrangement = Arrangement.spacedBy(8.dp)
                             ) {
-                                chunk.forEach { category ->
-                                    val isSelected = tempSelectedCategories.contains(category)
+                                chunk.forEach { topic ->
+                                    val isSelected = tempSelectedCategories.contains(topic)
                                     Box(
                                         modifier = Modifier
                                             .weight(1f)
                                             .clip(RoundedCornerShape(10.dp))
-                                            .background(if (isSelected) PinkPrimary.copy(alpha = 0.2f) else borderColor)
+                                            .background(if (isSelected) PinkPrimary.copy(alpha = 0.2f) else borderColor.copy(alpha = 0.35f))
                                             .border(1.dp, if (isSelected) PinkPrimary else Color.Transparent, RoundedCornerShape(10.dp))
                                             .clickable {
                                                 tempSelectedCategories = if (isSelected) {
-                                                    tempSelectedCategories - category
+                                                    tempSelectedCategories - topic
                                                 } else {
-                                                    tempSelectedCategories + category
+                                                    tempSelectedCategories + topic
                                                 }
                                             }
                                             .padding(vertical = 8.dp),
                                         contentAlignment = Alignment.Center
                                     ) {
                                         Text(
-                                            text = category,
-                                            color = if (isSelected) PinkPrimary else Color.White,
+                                            text = topic,
+                                            color = if (isSelected) PinkPrimary else textColor,
                                             fontSize = 12.sp,
-                                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
+                                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                                            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                                            maxLines = 2
                                         )
                                     }
                                 }
@@ -917,7 +829,7 @@ fun ModelSideProfileScreen(
                             }
                         }
                     }
-
+                    
                     Spacer(modifier = Modifier.height(16.dp))
                     
                     OutlinedTextField(
@@ -950,20 +862,6 @@ fun ModelSideProfileScreen(
                                 fullNameError = null
                             }
 
-                            if (tempPhone.isBlank()) {
-                                phoneError = "Required"
-                                isValid = false
-                            } else {
-                                phoneError = null
-                            }
-
-                            if (tempLocation.isBlank()) {
-                                locationError = "Required"
-                                isValid = false
-                            } else {
-                                locationError = null
-                            }
-
                             if (tempAge.isBlank() || tempAge.toIntOrNull() == null) {
                                 ageError = "Invalid age"
                                 isValid = false
@@ -973,8 +871,11 @@ fun ModelSideProfileScreen(
                             
                             if (isValid) {
                                 viewModel?.updateModelProfileIdentity(tempUsername, tempFullName)
-                                phone = tempPhone
-                                location = tempLocation
+                                viewModel?.updateModelProfileContent(
+                                    bio = tempBio,
+                                    languages = tempSelectedLanguages,
+                                    categories = tempSelectedCategories
+                                )
                                 age = tempAge
                                 gender = tempGender
                                 bio = tempBio
@@ -1001,35 +902,6 @@ fun ModelSideProfileScreen(
                     }
                 }
             } else if (selectedTab == 2) {
-                val mediaModel = currentModel ?: models.firstOrNull()
-                if (mediaModel != null) {
-                    ModelMediaUploadSection(
-                        model = mediaModel,
-                        cardBg = cardBg,
-                        borderColor = borderColor,
-                        textColor = textColor,
-                        secondaryTextColor = secondaryTextColor,
-                        onAddPhoto = { photoPicker.launch("image/*") },
-                        onRemovePhoto = { index ->
-                            viewModel?.removeGalleryPhotoFromCurrentModel(index)
-                            Toast.makeText(context, "Photo removed", Toast.LENGTH_SHORT).show()
-                        },
-                        onUploadVideo = { videoPicker.launch("video/*") },
-                        onRemoveVideo = {
-                            viewModel?.clearIntroVideoForCurrentModel()
-                            Toast.makeText(context, "Intro video removed", Toast.LENGTH_SHORT).show()
-                        },
-                        onPhotoClick = { url, index -> selectedGalleryImage = url to index },
-                        modifier = Modifier.padding(horizontal = 0.dp)
-                    )
-                } else {
-                    Text(
-                        "Loading profile…",
-                        color = secondaryTextColor,
-                        modifier = Modifier.padding(16.dp)
-                    )
-                }
-            } else if (selectedTab == 3) {
                 val models by (viewModel?.models ?: kotlinx.coroutines.flow.MutableStateFlow(emptyList()))
                     .collectAsStateWithLifecycle()
                 val currentModelId = viewModel?.getCurrentModelId()
@@ -1213,7 +1085,7 @@ fun ModelSideProfileScreen(
                 title = { Text("Withdraw Funds", color = textColor) },
                 text = {
                     Column {
-                        Text("Available: $currentDailyEarn Tokens", color = secondaryTextColor)
+                        Text("Available: $currentDailyEarn Rupees", color = secondaryTextColor)
                         Spacer(modifier = Modifier.height(16.dp))
                         
                         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
@@ -1280,15 +1152,6 @@ fun ModelSideProfileScreen(
                         Text("Cancel", color = secondaryTextColor)
                     }
                 }
-            )
-        }
-
-        selectedGalleryImage?.let { (url, index) ->
-            FullScreenImageDialog(
-                imageUrl = url,
-                imageIndex = index,
-                totalImages = galleryImages.size,
-                onDismiss = { selectedGalleryImage = null }
             )
         }
 
@@ -1469,7 +1332,7 @@ internal fun ModelEarningDetailsDialog(
                 DetailRow("Duration", earning.duration, textColor, secondaryTextColor)
                 DetailRow("Date & Time", earning.date, textColor, secondaryTextColor)
                 DetailRow("Status", earning.status, textColor, secondaryTextColor, valueColor = appSuccessColor())
-                DetailRow("Tokens Earned", "+${earning.amountEarned}", textColor, secondaryTextColor, valueColor = appSuccessColor())
+                DetailRow("Rupees Earned", "+${earning.amountEarned}", textColor, secondaryTextColor, valueColor = appSuccessColor())
                 DetailRow("Reference ID", earning.id, textColor, secondaryTextColor)
                 HorizontalDivider(color = borderColor)
                 Text(

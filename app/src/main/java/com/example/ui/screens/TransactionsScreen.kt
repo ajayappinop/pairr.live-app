@@ -14,7 +14,7 @@ import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.ArrowDownward
 import androidx.compose.material.icons.filled.ArrowUpward
 import androidx.compose.material.icons.filled.FilterList
-import androidx.compose.material.icons.filled.MonetizationOn
+import androidx.compose.material.icons.filled.CurrencyRupee
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -150,7 +150,7 @@ fun TransactionsScreen(
                         }
                         Spacer(modifier = Modifier.height(10.dp))
                         Text(
-                            text = String.format("+%,d Tokens", totalRecharged),
+                            text = String.format("+%,d Rupees", totalRecharged),
                             color = appSuccessColor(),
                             fontSize = 16.sp,
                             fontWeight = FontWeight.Bold
@@ -186,7 +186,7 @@ fun TransactionsScreen(
                         }
                         Spacer(modifier = Modifier.height(10.dp))
                         Text(
-                            text = String.format("%,d Tokens", totalSpends),
+                            text = String.format("%,d Rupees", totalSpends),
                             color = appErrorColor(),
                             fontSize = 16.sp,
                             fontWeight = FontWeight.Bold
@@ -258,8 +258,8 @@ fun TransactionsScreen(
                                     contentAlignment = Alignment.Center
                                 ) {
                                     Icon(
-                                        imageVector = Icons.Default.MonetizationOn,
-                                        contentDescription = "Token Tx",
+                                        imageVector = Icons.Default.CurrencyRupee,
+                                            contentDescription = "Rupee Tx",
                                         tint = if (tx.isPositive) appSuccessColor() else appErrorColor(),
                                         modifier = Modifier.size(20.dp)
                                     )

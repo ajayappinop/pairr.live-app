@@ -1,6 +1,5 @@
 package com.example.ui.screens
 
-import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -11,16 +10,12 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Call
-import androidx.compose.material.icons.filled.CallEnd
 import androidx.compose.material.icons.filled.CallMade
 import androidx.compose.material.icons.filled.CallMissed
 import androidx.compose.material.icons.filled.CallReceived
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Videocam
-import androidx.compose.material.icons.filled.DateRange
-import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.foundation.horizontalScroll
@@ -32,16 +27,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
-import com.example.CallBooking
 import com.example.MainViewModel
 import com.example.ui.components.PostCallRatingModal
 import com.example.ui.theme.AppFilterChip
-import com.example.ui.theme.AppSegmentedTabs
 import com.example.ui.theme.OrangeSecondary
 import com.example.ui.theme.PinkPrimary
 import com.example.ui.theme.SoftScreenBackground
@@ -53,21 +45,16 @@ import com.example.ui.theme.AppBorderWeight
 
 @Composable
 fun CallDashboardScreen(viewModel: MainViewModel) {
-    var selectedTab by remember { mutableStateOf(0) }
     var ratingModalVisible by remember { mutableStateOf(false) }
     var modalTargetName by remember { mutableStateOf("") }
     var modalTargetAvatar by remember { mutableStateOf("") }
     
-    val bg = MaterialTheme.colorScheme.background
-    val cardBg = MaterialTheme.colorScheme.surface
-    val borderColor = MaterialTheme.colorScheme.outline
     val textColor = MaterialTheme.colorScheme.onSurface
 
     SoftScreenBackground {
     Column(
         modifier = Modifier.fillMaxSize()
     ) {
-        // App Bar
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -82,33 +69,13 @@ fun CallDashboardScreen(viewModel: MainViewModel) {
             )
         }
 
-        // Tabs
-        AppSegmentedTabs(
-            tabs = listOf("Scheduled", "History"),
-            selectedIndex = selectedTab,
-            onTabSelected = { selectedTab = it },
-            modifier = Modifier.padding(horizontal = 16.dp),
-            fontSize = 13.sp,
-            verticalPadding = 10.dp
+        CallHistorySection(
+            onRateCall = { name, avatarUrl ->
+                modalTargetName = name
+                modalTargetAvatar = avatarUrl
+                ratingModalVisible = true
+            }
         )
-
-        Spacer(modifier = Modifier.height(16.dp))
-
-        // Content
-        when (selectedTab) {
-            0 -> {
-                ScheduledCallsSection(viewModel = viewModel)
-            }
-            else -> {
-                CallHistorySection(
-                    onRateCall = { name, avatarUrl ->
-                        modalTargetName = name
-                        modalTargetAvatar = avatarUrl
-                        ratingModalVisible = true
-                    }
-                )
-            }
-        }
     }
     
     if (ratingModalVisible) {
@@ -122,215 +89,6 @@ fun CallDashboardScreen(viewModel: MainViewModel) {
             }
         )
     }
-    }
-}
-
-@Composable
-fun ScheduledCallsSection(viewModel: MainViewModel) {
-    val bookings by viewModel.bookings.collectAsState()
-    val context = LocalContext.current
-    val cardBg = MaterialTheme.colorScheme.surface
-    val borderColor = MaterialTheme.colorScheme.outline
-    val textColor = MaterialTheme.colorScheme.onSurface
-
-    if (bookings.isEmpty()) {
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(32.dp),
-            contentAlignment = Alignment.Center
-        ) {
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Text(
-                    text = "No Scheduled Calls",
-                    color = textColor,
-                    fontSize = 18.sp,
-                    fontWeight = FontWeight.Bold
-                )
-                Spacer(modifier = Modifier.height(8.dp))
-                Text(
-                    text = "Book a future audio or video call with your favorite models from their details page.",
-                    color = textColor.copy(alpha = 0.5f),
-                    fontSize = 14.sp,
-                    textAlign = androidx.compose.ui.text.style.TextAlign.Center
-                )
-            }
-        }
-    } else {
-        LazyColumn(
-            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
-            verticalArrangement = Arrangement.spacedBy(14.dp),
-            modifier = Modifier.fillMaxSize()
-        ) {
-            items(bookings) { booking ->
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .appSurfaceCard(shape = RoundedCornerShape(18.dp))
-                        .padding(16.dp)
-                ) {
-                    // Header: Avatar, Name, Status Badge
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        AsyncImage(
-                            model = booking.modelAvatarUrl,
-                            contentDescription = "Avatar",
-                            modifier = Modifier
-                                .size(48.dp)
-                                .clip(CircleShape),
-                            contentScale = ContentScale.Crop
-                        )
-                        Spacer(modifier = Modifier.width(12.dp))
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = booking.modelName,
-                                color = textColor,
-                                fontSize = 16.sp,
-                                fontWeight = FontWeight.Bold
-                            )
-                            Spacer(modifier = Modifier.height(4.dp))
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Icon(
-                                    imageVector = if (booking.isVideo) Icons.Default.Videocam else Icons.Default.Call,
-                                    contentDescription = "Call Type",
-                                    tint = if (booking.isVideo) appErrorColor() else appSuccessColor(),
-                                    modifier = Modifier.size(14.dp)
-                                )
-                                Spacer(modifier = Modifier.width(4.dp))
-                                Text(
-                                    text = if (booking.isVideo) "Video Co-host Call" else "Audio Voice Call",
-                                    color = appMutedText(),
-                                    fontSize = 12.sp
-                                )
-                            }
-                        }
-
-                        // Status Badge
-                        val statusColor = when (booking.status) {
-                            "Accepted" -> appSuccessColor()
-                            "Scheduled" -> OrangeSecondary
-                            "Cancelled" -> appErrorColor()
-                            else -> appMutedText()
-                        }
-                        val statusLabel = when (booking.status) {
-                            "Scheduled" -> "Awaiting model"
-                            "Accepted" -> "Confirmed"
-                            else -> booking.status
-                        }
-                        Box(
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(8.dp))
-                                .background(statusColor.copy(alpha = 0.15f))
-                                .border(1.dp, statusColor.copy(alpha = 0.4f), RoundedCornerShape(8.dp))
-                                .padding(horizontal = 10.dp, vertical = 4.dp)
-                        ) {
-                            Text(
-                                text = statusLabel,
-                                color = statusColor,
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.Bold
-                            )
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.height(14.dp))
-                    HorizontalDivider(color = borderColor)
-                    Spacer(modifier = Modifier.height(12.dp))
-
-                    // Date & Time slots details
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(16.dp)
-                    ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier.weight(1f)
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.DateRange,
-                                contentDescription = "Date",
-                                tint = PinkPrimary,
-                                modifier = Modifier.size(16.dp)
-                            )
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text(
-                                text = booking.date,
-                                color = appMutedText(),
-                                fontSize = 13.sp,
-                                fontWeight = FontWeight.Medium
-                            )
-                        }
-
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier.weight(1.2f)
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Schedule,
-                                contentDescription = "Time",
-                                tint = OrangeSecondary,
-                                modifier = Modifier.size(16.dp)
-                            )
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text(
-                                text = booking.timeSlot,
-                                color = appMutedText(),
-                                fontSize = 13.sp,
-                                fontWeight = FontWeight.Medium
-                            )
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.height(14.dp))
-
-                    // Footer actions
-                    if (booking.status == "Scheduled" || booking.status == "Accepted") {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.End,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            // Cancel booking text button
-                            OutlinedButton(
-                                onClick = {
-                                    viewModel.cancelBooking(booking.id)
-                                    Toast.makeText(context, "Call booking cancelled successfully.", Toast.LENGTH_SHORT).show()
-                                },
-                                shape = RoundedCornerShape(10.dp),
-                                colors = ButtonDefaults.outlinedButtonColors(contentColor = appErrorColor()),
-                                border = androidx.compose.foundation.BorderStroke(1.dp, appErrorColor().copy(alpha = 0.3f)),
-                                modifier = Modifier.padding(end = 10.dp)
-                            ) {
-                                Icon(Icons.Default.Delete, contentDescription = "Cancel", modifier = Modifier.size(14.dp))
-                                Spacer(modifier = Modifier.width(4.dp))
-                                Text("Cancel", fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                            }
-
-                            // Join / Start call button
-                            Button(
-                                onClick = {
-                                    Toast.makeText(context, "Starting call with ${booking.modelName}... Initiating high fidelity streaming channel.", Toast.LENGTH_LONG).show()
-                                },
-                                shape = RoundedCornerShape(10.dp),
-                                colors = ButtonDefaults.buttonColors(containerColor = PinkPrimary)
-                            ) {
-                                Text("Start Call", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color.White)
-                            }
-                        }
-                    } else {
-                        // Cancelled state info text
-                        Text(
-                            text = "This booking was cancelled and your reservation has been released.",
-                            color = appMutedText(),
-                            fontSize = 11.sp,
-                            lineHeight = 15.sp
-                        )
-                    }
-                }
-            }
-        }
     }
 }
 

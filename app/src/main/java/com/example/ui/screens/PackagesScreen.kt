@@ -13,7 +13,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.FilterList
-import androidx.compose.material.icons.filled.MonetizationOn
 import androidx.compose.material.icons.filled.Phone
 import androidx.compose.material.icons.filled.Videocam
 import androidx.compose.material3.*
@@ -61,15 +60,15 @@ fun PackagesScreen(
 
     // Base Token packages
     val tokenPlans = listOf(
-        TokenPlan("Starter Audio Pack", 50, "$5.00", "Perfect for a quick audio call", isVideo = false),
-        TokenPlan("Standard Audio Pack", 250, "$20.00", "Save 10% on audio calls", isVideo = false),
-        TokenPlan("Premium Audio Pack", 600, "$45.00", "Save 20% + Extra Minutes", isVideo = false),
-        TokenPlan("Unlimited Audio VIP", 1500, "$99.00", "Save 30% + VIP Priority", isVideo = false),
+        TokenPlan("Starter Audio Pack", 50, "₹5.00", "Perfect for a quick audio call", isVideo = false),
+        TokenPlan("Standard Audio Pack", 250, "₹20.00", "Save 10% on audio calls", isVideo = false),
+        TokenPlan("Premium Audio Pack", 600, "₹45.00", "Save 20% + Extra Minutes", isVideo = false),
+        TokenPlan("Unlimited Audio VIP", 1500, "₹99.00", "Save 30% + VIP Priority", isVideo = false),
         
-        TokenPlan("Starter Video Pack", 50, "$10.00", "Try out high-quality streams", isVideo = true),
-        TokenPlan("Standard Video Pack", 250, "$40.00", "Save 15% on video calls", isVideo = true),
-        TokenPlan("Premium Video Pack", 600, "$80.00", "Save 25% + HD support", isVideo = true),
-        TokenPlan("Supreme Video VIP", 1500, "$180.00", "Save 35% + Maximum savings", isVideo = true)
+        TokenPlan("Starter Video Pack", 50, "₹10.00", "Try out high-quality streams", isVideo = true),
+        TokenPlan("Standard Video Pack", 250, "₹40.00", "Save 15% on video calls", isVideo = true),
+        TokenPlan("Premium Video Pack", 600, "₹80.00", "Save 25% + HD support", isVideo = true),
+        TokenPlan("Supreme Video VIP", 1500, "₹180.00", "Save 35% + Maximum savings", isVideo = true)
     )
 
     val filteredPlans = remember(selectedFilter, tokenPlans) {
@@ -85,7 +84,7 @@ fun PackagesScreen(
             TopAppBar(
                 title = {
                     Text(
-                        "Token Store",
+                        "Rupee Store",
                         color = MaterialTheme.colorScheme.onSurface,
                         fontWeight = FontWeight.Bold,
                         fontSize = 20.sp
@@ -151,7 +150,7 @@ fun PackagesScreen(
                         }
                         Spacer(modifier = Modifier.height(10.dp))
                         Text(
-                            text = "${walletState.audioBalance} Audio Tokens",
+                            text = "${walletState.audioBalance} Audio Rupees",
                             color = appSuccessColor(),
                             fontSize = 15.sp,
                             fontWeight = FontWeight.Bold
@@ -188,7 +187,7 @@ fun PackagesScreen(
                         }
                         Spacer(modifier = Modifier.height(10.dp))
                         Text(
-                            text = "${walletState.videoBalance} Video Tokens",
+                            text = "${walletState.videoBalance} Video Rupees",
                             color = appVideoAccentColor(),
                             fontSize = 15.sp,
                             fontWeight = FontWeight.Bold
@@ -282,7 +281,7 @@ fun PackagesScreen(
                                     )
                                     Spacer(modifier = Modifier.height(4.dp))
                                     Text(
-                                        text = "${plan.tokens} Tokens • ${plan.bonus}",
+                                        text = "${plan.tokens} Rupees • ${plan.bonus}",
                                         color = appMutedText(),
                                         fontSize = 12.sp
                                     )
@@ -315,7 +314,7 @@ fun PackagesScreen(
             },
             text = {
                 Text(
-                    text = "Would you like to buy '${plan.title}' for ${plan.price}? This will immediately credit ${plan.tokens} ${if (plan.isVideo) "Video" else "Audio"} Tokens to your available balance.",
+                    text = "Would you like to buy '${plan.title}' for ${plan.price}? This will immediately credit ${plan.tokens} ${if (plan.isVideo) "Video" else "Audio"} Rupees to your available balance.",
                     color = textColor.copy(alpha = 0.7f),
                     fontSize = 14.sp
                 )
@@ -324,7 +323,7 @@ fun PackagesScreen(
                 TextButton(
                     onClick = {
                         viewModel.rechargeTokens(plan.tokens, plan.isVideo)
-                        Toast.makeText(context, "Successfully purchased ${plan.tokens} ${if (plan.isVideo) "Video" else "Audio"} Tokens!", Toast.LENGTH_LONG).show()
+                        Toast.makeText(context, "Successfully purchased ${plan.tokens} ${if (plan.isVideo) "Video" else "Audio"} Rupees!", Toast.LENGTH_LONG).show()
                         showPurchaseConfirmDialog = null
                     }
                 ) {

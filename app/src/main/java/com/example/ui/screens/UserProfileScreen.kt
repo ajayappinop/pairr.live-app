@@ -19,7 +19,8 @@ import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.filled.Logout
-import androidx.compose.material.icons.filled.MonetizationOn
+import androidx.compose.material.icons.filled.CurrencyRupee
+import androidx.compose.material.icons.filled.Badge
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Notifications
@@ -40,9 +41,6 @@ import androidx.compose.material.icons.filled.VolumeUp
 import androidx.compose.material.icons.filled.Vibration
 import androidx.compose.material.icons.filled.Phone
 import androidx.compose.material.icons.filled.Email
-import androidx.compose.material.icons.filled.LocationOn
-import androidx.compose.material.icons.filled.Tag
-import androidx.compose.material.icons.filled.Badge
 import androidx.compose.material.icons.filled.Videocam
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.FilterList
@@ -66,11 +64,9 @@ import coil.compose.AsyncImage
 import com.example.data.Wallet
 import com.example.data.formattedBalanceFull
 import com.example.data.publicUsername
-import com.example.ui.theme.LightPromoGradients
 import com.example.ui.theme.OrangeSecondary
 import com.example.ui.theme.PinkPrimary
 import com.example.ui.theme.AppSegmentedTabs
-import com.example.ui.theme.DarkPromoGradients
 import com.example.ui.theme.LightOnSurface
 import com.example.ui.theme.SoftScreenBackground
 import com.example.ui.theme.appAudioAccentContainer
@@ -111,20 +107,13 @@ fun UserProfileScreen(
     onViewPackages: ((String) -> Unit)? = null,
     onLogout: (() -> Unit)? = null
 ) {
-    var username by rememberSaveable { mutableStateOf("john_doe_99") }
     var fullName by rememberSaveable { mutableStateOf("John Doe") }
+    var username by rememberSaveable { mutableStateOf("john_doe") }
     var email by remember { mutableStateOf("john.doe@example.com") }
     var phone by rememberSaveable { mutableStateOf("+1 (555) 019-2834") }
-    var location by rememberSaveable { mutableStateOf("New York, USA") }
-    val uniqueId = remember { "UID-${(100000..999999).random()}" }
-    var age by rememberSaveable { mutableStateOf("28") }
-    var gender by rememberSaveable { mutableStateOf("Male") }
     var bio by rememberSaveable { mutableStateOf("Hey there! I am using the app to explore custom matches.") }
     var language by rememberSaveable { mutableStateOf("English") }
     var profilePhotoUri by remember { mutableStateOf<Uri?>(null) }
-    
-    val availableInterests = listOf("Music", "Coding", "Reading", "Travel", "Fitness", "Gaming", "Photography", "Cooking", "Art", "Movies", "Sports", "Nature")
-    var selectedInterests by remember { mutableStateOf(setOf("Music", "Coding", "Travel", "Fitness")) }
     
     var isSettingsShowing by remember { mutableStateOf(false) }
 
@@ -139,27 +128,50 @@ fun UserProfileScreen(
         return
     }
 
-    var tempUsername by remember { mutableStateOf(username) }
-    var tempFullName by remember { mutableStateOf(fullName) }
-    var tempPhone by remember { mutableStateOf(phone) }
-    var tempLocation by remember { mutableStateOf(location) }
-    var tempAge by remember { mutableStateOf(age) }
-    var tempGender by remember { mutableStateOf(gender) }
     var tempBio by remember { mutableStateOf(bio) }
     var tempLanguage by remember { mutableStateOf(language) }
-    var tempSelectedInterests by remember { mutableStateOf(selectedInterests) }
-
-    var usernameError by remember { mutableStateOf<String?>(null) }
+    var tempFullName by remember { mutableStateOf(fullName) }
+    var tempUsername by remember { mutableStateOf(username) }
     var fullNameError by remember { mutableStateOf<String?>(null) }
-    var phoneError by remember { mutableStateOf<String?>(null) }
-    var locationError by remember { mutableStateOf<String?>(null) }
-    var ageError by remember { mutableStateOf<String?>(null) }
-    
-    var genderExpanded by remember { mutableStateOf(false) }
-    val genders = listOf("Male", "Female", "Other", "Prefer not to say")
-    
+    var usernameError by remember { mutableStateOf<String?>(null) }
+
+    val currentUserId by viewModel?.currentUserId?.collectAsStateWithLifecycle() ?: remember { mutableStateOf<String?>(null) }
+    val userNames by viewModel?.userNames?.collectAsStateWithLifecycle() ?: remember { mutableStateOf(emptyMap()) }
+    val userUsernames by viewModel?.userUsernames?.collectAsStateWithLifecycle() ?: remember { mutableStateOf(emptyMap()) }
+
+    LaunchedEffect(currentUserId, userNames, userUsernames) {
+        currentUserId?.let { id ->
+            userNames.entries.firstOrNull { (key, _) ->
+                key == id || key.removeSuffix("@dummy.phone") == id.removeSuffix("@dummy.phone")
+            }?.value?.let {
+                fullName = it
+                tempFullName = it
+            }
+            userUsernames.entries.firstOrNull { (key, _) ->
+                key == id || key.removeSuffix("@dummy.phone") == id.removeSuffix("@dummy.phone")
+            }?.value?.let {
+                username = it
+                tempUsername = it
+            }
+        }
+    }
+
     var languageExpanded by remember { mutableStateOf(false) }
-    val languages = listOf("English", "Spanish", "French", "German", "Hindi", "Japanese", "Chinese")
+    val languages = listOf(
+        "English",
+        "Hindi",
+        "Bengali",
+        "Telugu",
+        "Marathi",
+        "Tamil",
+        "Gujarati",
+        "Kannada",
+        "Malayalam",
+        "Punjabi",
+        "Odia",
+        "Assamese",
+        "Urdu"
+    )
 
     val imagePicker = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent()
@@ -231,38 +243,14 @@ fun UserProfileScreen(
                     fontSize = 26.sp,
                     fontWeight = FontWeight.Bold
                 )
-                
-                Spacer(modifier = Modifier.height(8.dp))
-                
                 Text(
-                    text = "ID : ${uniqueId.filter { it.isDigit() }.ifEmpty { "53878700" }}",
-                    color = secondaryTextColor,
-                    fontSize = 16.sp,
+                    text = "@$username",
+                    color = appMutedText(),
+                    fontSize = 14.sp,
                     fontWeight = FontWeight.Medium
                 )
                 
-                Spacer(modifier = Modifier.height(14.dp))
-                
-                Box(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(20.dp))
-                        .background(PinkPrimary.copy(alpha = 0.12f))
-                        .border(1.dp, PinkPrimary.copy(alpha = 0.35f), RoundedCornerShape(20.dp))
-                        .padding(horizontal = 24.dp, vertical = 6.dp)
-                ) {
-                    Text(
-                        text = "Beginner",
-                        color = PinkPrimary,
-                        fontSize = 14.sp,
-                        fontWeight = FontWeight.Bold
-                    )
-                }
-                
-                Spacer(modifier = Modifier.height(12.dp))
-                
-                Text(text = "🥰", fontSize = 26.sp)
-                
-                Spacer(modifier = Modifier.height(28.dp))
+                Spacer(modifier = Modifier.height(20.dp))
                 
                 HorizontalDivider(
                     modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp),
@@ -283,15 +271,13 @@ fun UserProfileScreen(
             }
             
             // Avatar (Overlapping)
-            Box {
-                AsyncImage(
-                    model = profilePhotoUri ?: "https://i.pravatar.cc/300?u=user",
-                    contentDescription = "User Profile",
-                    modifier = Modifier
-                        .size(110.dp)
-                        .clip(CircleShape)
-                        .border(3.dp, Color.White, CircleShape),
-                    contentScale = ContentScale.Crop
+            Box(modifier = Modifier.align(Alignment.TopCenter)) {
+                ProfilePhotoAvatar(
+                    photoUri = profilePhotoUri,
+                    size = 110.dp,
+                    borderColor = Color.White,
+                    borderWidth = 3.dp,
+                    onClick = { imagePicker.launch("image/*") }
                 )
             }
         }
@@ -313,7 +299,7 @@ fun UserProfileScreen(
                 val compact = isCompactWidth()
                 val transactionsList = viewModel?.transactions?.collectAsState()?.value ?: emptyList()
 
-                // Available Tokens Card
+                // Available Rupees Card
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -329,13 +315,13 @@ fun UserProfileScreen(
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Column(modifier = Modifier.weight(1f).padding(end = 8.dp)) {
-                                Text("Total Token Balance", color = appMutedText(), fontSize = 14.sp, fontWeight = FontWeight.Medium)
+                                Text("Total Rupee Balance", color = appMutedText(), fontSize = 14.sp, fontWeight = FontWeight.Medium)
                                 Spacer(modifier = Modifier.height(6.dp))
                                 Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Icon(Icons.Default.MonetizationOn, contentDescription = "Tokens", tint = PinkPrimary, modifier = Modifier.size(24.dp))
+                                    Icon(Icons.Default.CurrencyRupee, contentDescription = "Rupees", tint = PinkPrimary, modifier = Modifier.size(24.dp))
                                     Spacer(modifier = Modifier.width(6.dp))
                                     Text(
-                                        "${wallet.formattedBalanceFull()} Tokens",
+                                        "${wallet.formattedBalanceFull()} Rupees",
                                         color = textColor,
                                         fontSize = if (compact) 20.sp else 24.sp,
                                         fontWeight = FontWeight.Bold,
@@ -358,7 +344,7 @@ fun UserProfileScreen(
                                     Icon(Icons.Default.Add, contentDescription = "Add", tint = Color.White, modifier = Modifier.size(16.dp))
                                     if (!compact) {
                                         Spacer(modifier = Modifier.width(4.dp))
-                                        Text("Add Tokens", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                                        Text("Add Rupees", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 13.sp)
                                     }
                                 }
                             }
@@ -372,7 +358,7 @@ fun UserProfileScreen(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceBetween
                         ) {
-                            // Audio Tokens Column
+                            // Audio Rupees Column
                             Column(
                                 modifier = Modifier
                                     .weight(1f)
@@ -386,14 +372,14 @@ fun UserProfileScreen(
                             ) {
                                 Icon(Icons.Default.Phone, contentDescription = "Audio Calls", tint = PinkPrimary, modifier = Modifier.size(20.dp))
                                 Spacer(modifier = Modifier.height(6.dp))
-                                Text("Audio Tokens", color = appMutedText(), fontSize = 12.sp, fontWeight = FontWeight.Medium)
+                                Text("Audio Rupees", color = appMutedText(), fontSize = 12.sp, fontWeight = FontWeight.Medium)
                                 Spacer(modifier = Modifier.height(4.dp))
                                 Text("${wallet.audioBalance}", color = textColor, fontSize = 18.sp, fontWeight = FontWeight.Bold)
                             }
                             
                             Spacer(modifier = Modifier.width(16.dp))
                             
-                            // Video Tokens Column
+                            // Video Rupees Column
                             Column(
                                 modifier = Modifier
                                     .weight(1f)
@@ -407,7 +393,7 @@ fun UserProfileScreen(
                             ) {
                                 Icon(Icons.Default.Videocam, contentDescription = "Video Calls", tint = OrangeSecondary, modifier = Modifier.size(20.dp))
                                 Spacer(modifier = Modifier.height(6.dp))
-                                Text("Video Tokens", color = appMutedText(), fontSize = 12.sp, fontWeight = FontWeight.Medium)
+                                Text("Video Rupees", color = appMutedText(), fontSize = 12.sp, fontWeight = FontWeight.Medium)
                                 Spacer(modifier = Modifier.height(4.dp))
                                 Text("${wallet.videoBalance}", color = textColor, fontSize = 18.sp, fontWeight = FontWeight.Bold)
                             }
@@ -455,75 +441,10 @@ fun UserProfileScreen(
                             Text("Click for Info", color = appMutedText(), fontSize = 12.sp, fontWeight = FontWeight.Medium)
                         }
                         Spacer(modifier = Modifier.height(8.dp))
-                        Text("Active • $49.99/mo (1,250 tokens per cycle included)", color = secondaryTextColor, fontSize = 14.sp)
+                        Text("Active • ₹49.99/mo (1,250 rupees per cycle included)", color = secondaryTextColor, fontSize = 14.sp)
                     }
                 }
                 
-                Spacer(modifier = Modifier.height(24.dp))
-                
-                // Beautiful Promo Card to visit the separate Token Store
-                val promoGradient = if (isAppDarkTheme()) {
-                    Brush.horizontalGradient(DarkPromoGradients.welcome)
-                } else {
-                    Brush.horizontalGradient(LightPromoGradients.welcome)
-                }
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(20.dp))
-                        .background(promoGradient)
-                        .border(1.dp, PinkPrimary.copy(alpha = 0.5f), RoundedCornerShape(20.dp))
-                        .clickable { onViewPackages?.invoke("All") }
-                        .padding(horizontal = 20.dp, vertical = 18.dp)
-                ) {
-                    Column(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Icon(
-                                Icons.Default.MonetizationOn,
-                                contentDescription = "Token Store",
-                                tint = Color(0xFFFFB800),
-                                modifier = Modifier.size(24.dp)
-                            )
-                            Spacer(modifier = Modifier.width(10.dp))
-                            Text(
-                                text = "Instant Token Packs Available!",
-                                color = if (isAppDarkTheme()) Color.White else LightOnSurface,
-                                fontSize = 16.sp,
-                                fontWeight = FontWeight.Bold,
-                                lineHeight = 20.sp,
-                                modifier = Modifier.weight(1f)
-                            )
-                        }
-                        Text(
-                            text = "Tap here to browse all Audio & Video token packages. Get customized packages, discount minutes, and HD streaming credits fully detailed in our Store.",
-                            color = appSecondaryText(),
-                            fontSize = 13.sp,
-                            lineHeight = 18.sp,
-                            modifier = Modifier.fillMaxWidth()
-                        )
-                        Box(
-                            modifier = Modifier
-                                .align(Alignment.End)
-                                .clip(RoundedCornerShape(12.dp))
-                                .background(pinkGradient)
-                                .padding(horizontal = 16.dp, vertical = 10.dp)
-                        ) {
-                            Text(
-                                text = "Browse Packages 📦",
-                                color = Color.White,
-                                fontSize = 12.sp,
-                                fontWeight = FontWeight.Bold
-                            )
-                        }
-                    }
-                }
-
                 Spacer(modifier = Modifier.height(24.dp))
                 // Section of Transactions at the Bottom
                 Row(
@@ -583,8 +504,8 @@ fun UserProfileScreen(
                                         contentAlignment = Alignment.Center
                                     ) {
                                         Icon(
-                                            imageVector = Icons.Default.MonetizationOn,
-                                            contentDescription = "Token Tx",
+                                            imageVector = Icons.Default.CurrencyRupee,
+                                            contentDescription = "Rupee Tx",
                                             tint = if (tx.isPositive) appSuccessColor() else appErrorColor(),
                                             modifier = Modifier.size(18.dp)
                                         )
@@ -632,12 +553,12 @@ fun UserProfileScreen(
                                     Text("Gold Subscription", color = PinkPrimary, fontSize = 14.sp, fontWeight = FontWeight.Bold)
                                 }
                                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                                    Text("Tokens Included:", color = appSecondaryText(), fontSize = 14.sp)
-                                    Text("1,250 Tokens / Cycle", color = textColor, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                                    Text("Rupees Included:", color = appSecondaryText(), fontSize = 14.sp)
+                                    Text("1,250 Rupees / Cycle", color = textColor, fontSize = 14.sp, fontWeight = FontWeight.Bold)
                                 }
                                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                                     Text("Cost & Billing:", color = appSecondaryText(), fontSize = 14.sp)
-                                    Text("$49.99 / Billed Monthly", color = textColor, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                                    Text("₹49.99 / Billed Monthly", color = textColor, fontSize = 14.sp, fontWeight = FontWeight.Bold)
                                 }
                                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                                     Text("Purchase Date:", color = appSecondaryText(), fontSize = 14.sp)
@@ -674,11 +595,11 @@ fun UserProfileScreen(
                     AlertDialog(
                         onDismissRequest = { showPurchaseConfirmDialog = null },
                         title = {
-                            Text("Confirm Token Purchase", color = textColor, fontWeight = FontWeight.Bold)
+                            Text("Confirm Rupee Purchase", color = textColor, fontWeight = FontWeight.Bold)
                         },
                         text = {
                             Text(
-                                text = "Would you like to buy '${plan.title}' for ${plan.price}? This will immediately credit ${plan.tokens} ${if (plan.isVideo) "Video" else "Audio"} Tokens to your available balance.",
+                                text = "Would you like to buy '${plan.title}' for ${plan.price}? This will immediately credit ${plan.tokens} ${if (plan.isVideo) "Video" else "Audio"} Rupees to your available balance.",
                                 color = appSecondaryText(),
                                 fontSize = 14.sp
                             )
@@ -687,7 +608,7 @@ fun UserProfileScreen(
                             TextButton(
                                 onClick = {
                                     viewModel?.rechargeTokens(plan.tokens, plan.isVideo)
-                                    Toast.makeText(context, "Successfully purchased ${plan.tokens} ${if (plan.isVideo) "Video" else "Audio"} Tokens!", Toast.LENGTH_LONG).show()
+                                    Toast.makeText(context, "Successfully purchased ${plan.tokens} ${if (plan.isVideo) "Video" else "Audio"} Rupees!", Toast.LENGTH_LONG).show()
                                     showPurchaseConfirmDialog = null
                                 }
                             ) {
@@ -708,13 +629,13 @@ fun UserProfileScreen(
                     AlertDialog(
                         onDismissRequest = { showTopUpOptionsDialog = false },
                         title = {
-                            Text("Top Up Your Tokens", color = textColor, fontWeight = FontWeight.Bold, fontSize = 18.sp)
+                            Text("Top Up Your Rupees", color = textColor, fontWeight = FontWeight.Bold, fontSize = 18.sp)
                         },
                         text = {
                             Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
-                                Text("Select the token type to package and recharge. Audio and Video call tokens are split to provide optimized billing rates.", color = appSecondaryText(), fontSize = 13.sp)
+                                Text("Select the rupee type to package and recharge. Audio and Video call balances are split to provide optimized billing rates.", color = appSecondaryText(), fontSize = 13.sp)
                                 
-                                // Option A: Audio Tokens Top Up
+                                // Option A: Audio Rupees Top Up
                                 Row(
                                     modifier = Modifier
                                         .fillMaxWidth()
@@ -744,12 +665,12 @@ fun UserProfileScreen(
                                     }
                                     Spacer(modifier = Modifier.width(12.dp))
                                     Column {
-                                        Text("Top Up Audio Tokens", color = textColor, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                                        Text("Top Up Audio Rupees", color = textColor, fontWeight = FontWeight.Bold, fontSize = 14.sp)
                                         Text("Recharge credits optimized for voice calls", color = appCaptionText(), fontSize = 11.sp)
                                     }
                                 }
 
-                                // Option B: Video Tokens Top Up
+                                // Option B: Video Rupees Top Up
                                 Row(
                                     modifier = Modifier
                                         .fillMaxWidth()
@@ -779,7 +700,7 @@ fun UserProfileScreen(
                                     }
                                     Spacer(modifier = Modifier.width(12.dp))
                                     Column {
-                                        Text("Top Up Video Tokens", color = textColor, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                                        Text("Top Up Video Rupees", color = textColor, fontWeight = FontWeight.Bold, fontSize = 14.sp)
                                         Text("Recharge credits optimized for video streams", color = appCaptionText(), fontSize = 11.sp)
                                     }
                                 }
@@ -848,32 +769,70 @@ fun UserProfileScreen(
                         .border(1.dp, borderColor, RoundedCornerShape(20.dp))
                         .padding(16.dp)
                 ) {
-                    // Unique App ID (Read-only)
-                    OutlinedTextField(
-                        value = uniqueId,
-                        onValueChange = {},
-                        readOnly = true,
-                        label = { Text("App Unique ID (System Assigned)", color = appCaptionText()) },
-                        leadingIcon = { Icon(Icons.Default.Tag, contentDescription = "ID", tint = PinkPrimary) },
-                        modifier = Modifier.fillMaxWidth(),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedContainerColor = cardBg,
-                            unfocusedContainerColor = cardBg,
-                            disabledContainerColor = cardBg,
-                            focusedBorderColor = borderColor,
-                            unfocusedBorderColor = borderColor,
-                            focusedTextColor = appMutedText(),
-                            unfocusedTextColor = appMutedText()
-                        ),
-                        shape = RoundedCornerShape(12.dp)
+                    Text(
+                        text = "Profile Photo",
+                        color = textColor,
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Bold
                     )
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        ProfilePhotoAvatar(
+                            photoUri = profilePhotoUri,
+                            size = 84.dp,
+                            borderColor = borderColor,
+                            borderWidth = 2.dp
+                        )
+                        Spacer(modifier = Modifier.width(16.dp))
+                        Column(
+                            modifier = Modifier.weight(1f),
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            OutlinedButton(
+                                onClick = { imagePicker.launch("image/*") },
+                                modifier = Modifier.fillMaxWidth(),
+                                shape = RoundedCornerShape(12.dp),
+                                colors = ButtonDefaults.outlinedButtonColors(contentColor = PinkPrimary),
+                                border = androidx.compose.foundation.BorderStroke(1.dp, PinkPrimary.copy(alpha = 0.5f))
+                            ) {
+                                Icon(
+                                    Icons.Default.Edit,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text("Change Photo", fontWeight = FontWeight.SemiBold)
+                            }
+                            OutlinedButton(
+                                onClick = { profilePhotoUri = null },
+                                enabled = profilePhotoUri != null,
+                                modifier = Modifier.fillMaxWidth(),
+                                shape = RoundedCornerShape(12.dp),
+                                colors = ButtonDefaults.outlinedButtonColors(
+                                    contentColor = appMutedText(),
+                                    disabledContentColor = appMutedText().copy(alpha = 0.4f)
+                                ),
+                                border = androidx.compose.foundation.BorderStroke(1.dp, borderColor)
+                            ) {
+                                Icon(
+                                    Icons.Default.Delete,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text("Remove Photo", fontWeight = FontWeight.SemiBold)
+                            }
+                        }
+                    }
 
-                    Spacer(modifier = Modifier.height(16.dp))
+                    Spacer(modifier = Modifier.height(20.dp))
 
-                    // Full Name Field
                     OutlinedTextField(
                         value = tempFullName,
-                        onValueChange = { 
+                        onValueChange = {
                             tempFullName = it
                             if (it.isNotBlank()) fullNameError = null
                         },
@@ -883,16 +842,17 @@ fun UserProfileScreen(
                         colors = textFieldColors,
                         shape = RoundedCornerShape(12.dp),
                         isError = fullNameError != null,
-                        supportingText = { fullNameError?.let { Text(it, color = MaterialTheme.colorScheme.error) } }
+                        supportingText = fullNameError?.let { error ->
+                            { Text(error, color = MaterialTheme.colorScheme.error) }
+                        }
                     )
 
                     Spacer(modifier = Modifier.height(16.dp))
 
-                    // Username Field
                     OutlinedTextField(
                         value = tempUsername,
-                        onValueChange = { 
-                            tempUsername = it
+                        onValueChange = {
+                            tempUsername = it.lowercase().replace(Regex("\\s+"), "_")
                             if (it.isNotBlank()) usernameError = null
                         },
                         label = { Text("Username", color = appCaptionText()) },
@@ -901,94 +861,34 @@ fun UserProfileScreen(
                         colors = textFieldColors,
                         shape = RoundedCornerShape(12.dp),
                         isError = usernameError != null,
-                        supportingText = { usernameError?.let { Text(it, color = MaterialTheme.colorScheme.error) } }
+                        supportingText = {
+                            usernameError?.let { Text(it, color = MaterialTheme.colorScheme.error) }
+                                ?: Text("Shown on calls and public profile", color = appCaptionText(), fontSize = 12.sp)
+                        }
                     )
 
                     Spacer(modifier = Modifier.height(16.dp))
 
-
-                    // Phone Number Field
+                    // Phone Number Field (read-only)
                     OutlinedTextField(
-                        value = tempPhone,
-                        onValueChange = { 
-                            tempPhone = it
-                            if (it.isNotBlank()) phoneError = null
-                        },
+                        value = phone,
+                        onValueChange = {},
+                        readOnly = true,
                         label = { Text("Phone Number", color = appCaptionText()) },
                         leadingIcon = { Icon(Icons.Default.Phone, contentDescription = "Phone", tint = PinkPrimary) },
                         modifier = Modifier.fillMaxWidth(),
-                        colors = textFieldColors,
-                        shape = RoundedCornerShape(12.dp),
-                        isError = phoneError != null,
-                        supportingText = { phoneError?.let { Text(it, color = MaterialTheme.colorScheme.error) } }
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedContainerColor = cardBg,
+                            unfocusedContainerColor = cardBg,
+                            disabledContainerColor = cardBg,
+                            focusedBorderColor = borderColor,
+                            unfocusedBorderColor = borderColor,
+                            focusedTextColor = appMutedText(),
+                            unfocusedTextColor = appMutedText(),
+                            disabledTextColor = appMutedText()
+                        ),
+                        shape = RoundedCornerShape(12.dp)
                     )
-
-                    Spacer(modifier = Modifier.height(16.dp))
-
-                    // Location Field
-                    OutlinedTextField(
-                        value = tempLocation,
-                        onValueChange = { 
-                            tempLocation = it
-                            if (it.isNotBlank()) locationError = null
-                        },
-                        label = { Text("Location", color = appCaptionText()) },
-                        leadingIcon = { Icon(Icons.Default.LocationOn, contentDescription = "Location", tint = PinkPrimary) },
-                        modifier = Modifier.fillMaxWidth(),
-                        colors = textFieldColors,
-                        shape = RoundedCornerShape(12.dp),
-                        isError = locationError != null,
-                        supportingText = { locationError?.let { Text(it, color = MaterialTheme.colorScheme.error) } }
-                    )
-
-                    Spacer(modifier = Modifier.height(16.dp))
-
-                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                        ExposedDropdownMenuBox(
-                            expanded = genderExpanded,
-                            onExpandedChange = { genderExpanded = it },
-                            modifier = Modifier.weight(1f)
-                        ) {
-                            OutlinedTextField(
-                                value = tempGender,
-                                onValueChange = {},
-                                readOnly = true,
-                                label = { Text("Gender", color = appCaptionText()) },
-                                modifier = Modifier.menuAnchor().fillMaxWidth(),
-                                trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = genderExpanded) },
-                                colors = textFieldColors,
-                                shape = RoundedCornerShape(12.dp)
-                            )
-                            ExposedDropdownMenu(
-                                expanded = genderExpanded,
-                                onDismissRequest = { genderExpanded = false }
-                            ) {
-                                genders.forEach { selectionOption ->
-                                    DropdownMenuItem(
-                                        text = { Text(selectionOption) },
-                                        onClick = {
-                                            tempGender = selectionOption
-                                            genderExpanded = false
-                                        }
-                                    )
-                                }
-                            }
-                        }
-
-                        OutlinedTextField(
-                            value = tempAge,
-                            onValueChange = { 
-                                tempAge = it
-                                if (it.isNotBlank() && it.toIntOrNull() != null) ageError = null
-                            },
-                            label = { Text("Age", color = appCaptionText()) },
-                            modifier = Modifier.weight(1f),
-                            colors = textFieldColors,
-                            shape = RoundedCornerShape(12.dp),
-                            isError = ageError != null,
-                            supportingText = { ageError?.let { Text(it, color = MaterialTheme.colorScheme.error) } }
-                        )
-                    }
 
                     Spacer(modifier = Modifier.height(16.dp))
 
@@ -1002,6 +902,7 @@ fun UserProfileScreen(
                             onValueChange = {},
                             readOnly = true,
                             label = { Text("Language", color = appCaptionText()) },
+                            leadingIcon = { Icon(Icons.Default.Language, contentDescription = "Language", tint = PinkPrimary) },
                             modifier = Modifier.menuAnchor().fillMaxWidth(),
                             trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = languageExpanded) },
                             colors = textFieldColors,
@@ -1024,64 +925,6 @@ fun UserProfileScreen(
                     }
                     
                     Spacer(modifier = Modifier.height(16.dp))
-
-                    Text(
-                        text = "Interests & Hobbies (Select Multiple)",
-                        color = textColor,
-                        fontSize = 14.sp,
-                        fontWeight = FontWeight.Bold,
-                        modifier = Modifier.padding(bottom = 8.dp)
-                    )
-
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .border(1.dp, borderColor, RoundedCornerShape(12.dp))
-                            .background(cardBg)
-                            .padding(12.dp)
-                    ) {
-                        val chunks = availableInterests.chunked(3)
-                        chunks.forEach { chunk ->
-                            Row(
-                                modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
-                                horizontalArrangement = Arrangement.spacedBy(8.dp)
-                            ) {
-                                chunk.forEach { interest ->
-                                    val isSelected = tempSelectedInterests.contains(interest)
-                                    Box(
-                                        modifier = Modifier
-                                            .weight(1f)
-                                            .clip(RoundedCornerShape(10.dp))
-                                            .background(if (isSelected) PinkPrimary.copy(alpha = 0.2f) else borderColor)
-                                            .border(1.dp, if (isSelected) PinkPrimary else Color.Transparent, RoundedCornerShape(10.dp))
-                                            .clickable {
-                                                tempSelectedInterests = if (isSelected) {
-                                                    tempSelectedInterests - interest
-                                                } else {
-                                                    tempSelectedInterests + interest
-                                                }
-                                            }
-                                            .padding(vertical = 8.dp),
-                                        contentAlignment = Alignment.Center
-                                    ) {
-                                        Text(
-                                            text = interest,
-                                            color = if (isSelected) PinkPrimary else textColor,
-                                            fontSize = 12.sp,
-                                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
-                                        )
-                                    }
-                                }
-                                if (chunk.size < 3) {
-                                    repeat(3 - chunk.size) {
-                                        Spacer(modifier = Modifier.weight(1f))
-                                    }
-                                }
-                            }
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.height(16.dp))
                     
                     OutlinedTextField(
                         value = tempBio,
@@ -1099,53 +942,26 @@ fun UserProfileScreen(
                     Button(
                         onClick = {
                             var isValid = true
-                            if (tempUsername.isBlank()) {
-                                usernameError = "Required"
-                                isValid = false
-                            } else {
-                                usernameError = null
-                            }
-
                             if (tempFullName.isBlank()) {
                                 fullNameError = "Required"
                                 isValid = false
                             } else {
                                 fullNameError = null
                             }
-
-                            if (tempPhone.isBlank()) {
-                                phoneError = "Required"
+                            if (tempUsername.isBlank()) {
+                                usernameError = "Required"
                                 isValid = false
                             } else {
-                                phoneError = null
+                                usernameError = null
                             }
+                            if (!isValid) return@Button
 
-                            if (tempLocation.isBlank()) {
-                                locationError = "Required"
-                                isValid = false
-                            } else {
-                                locationError = null
-                            }
-
-                            if (tempAge.isBlank() || tempAge.toIntOrNull() == null) {
-                                ageError = "Invalid age"
-                                isValid = false
-                            } else {
-                                ageError = null
-                            }
-                            
-                            if (isValid) {
-                                username = tempUsername
-                                fullName = tempFullName
-                                phone = tempPhone
-                                location = tempLocation
-                                age = tempAge
-                                gender = tempGender
-                                bio = tempBio
-                                language = tempLanguage
-                                selectedInterests = tempSelectedInterests
-                                Toast.makeText(context, "Personal Info Saved Successfully!", Toast.LENGTH_SHORT).show()
-                            }
+                            fullName = tempFullName.trim()
+                            username = tempUsername.trim()
+                            bio = tempBio
+                            language = tempLanguage
+                            viewModel?.updateUserProfileIdentity(fullName, username)
+                            Toast.makeText(context, "Personal Info Saved Successfully!", Toast.LENGTH_SHORT).show()
                         },
                         modifier = Modifier
                             .fillMaxWidth()
@@ -1202,8 +1018,6 @@ fun UserProfileScreen(
                                         Text(String.format("%.1f", model.rating), color = textColor, fontSize = 13.sp, fontWeight = FontWeight.Bold)
                                         Text(" (${model.reviewsCount})", color = appSecondaryText(), fontSize = 12.sp)
                                     }
-                                    Spacer(modifier = Modifier.height(2.dp))
-                                    Text(model.categories.firstOrNull() ?: "", color = appSecondaryText(), fontSize = 14.sp)
                                 }
                                 IconButton(onClick = { viewModel?.toggleFavorite(model.id) }) {
                                     Icon(Icons.Default.Favorite, contentDescription = "Remove Favorite", tint = PinkPrimary)
@@ -1215,6 +1029,42 @@ fun UserProfileScreen(
             }
         }
     }
+    }
+}
+
+@Composable
+private fun ProfilePhotoAvatar(
+    photoUri: Uri?,
+    size: androidx.compose.ui.unit.Dp,
+    borderColor: Color,
+    borderWidth: androidx.compose.ui.unit.Dp = 2.dp,
+    onClick: (() -> Unit)? = null
+) {
+    val shape = CircleShape
+    Box(
+        modifier = Modifier
+            .size(size)
+            .clip(shape)
+            .border(borderWidth, borderColor, shape)
+            .background(MaterialTheme.colorScheme.surfaceVariant)
+            .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier),
+        contentAlignment = Alignment.Center
+    ) {
+        if (photoUri != null) {
+            AsyncImage(
+                model = photoUri,
+                contentDescription = "User Profile",
+                modifier = Modifier.fillMaxSize(),
+                contentScale = ContentScale.Crop
+            )
+        } else {
+            Icon(
+                Icons.Default.Person,
+                contentDescription = "User Profile",
+                tint = appMutedText(),
+                modifier = Modifier.size(size * 0.42f)
+            )
+        }
     }
 }
 
@@ -1442,10 +1292,10 @@ fun SettingsScreen(
         Spacer(modifier = Modifier.height(24.dp))
         
         // Referral Program (Simplified and placed at the bottom for normal users)
-        SettingsSection(title = "Invite & Earn 🎁", icon = Icons.Default.MonetizationOn) {
+        SettingsSection(title = "Invite & Earn 🎁", icon = Icons.Default.CurrencyRupee) {
             Column(modifier = Modifier.padding(16.dp)) {
                 Text(
-                    text = "Share the joy! Invite friends to join and get free rewards. For each friend who uses your invite code, both of you will receive 100 free bonus tokens!",
+                    text = "Share the joy! Invite friends to join and get free rewards. For each friend who uses your invite code, both of you will receive 100 free bonus rupees!",
                     color = appSecondaryText(),
                     fontSize = 13.sp,
                     lineHeight = 18.sp
@@ -1539,7 +1389,7 @@ fun SettingsScreen(
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
                         Text(
-                            text = "${referredUsers.size * 100} Tokens",
+                            text = "${referredUsers.size * 100} Rupees",
                             color = appStarColor(),
                             fontSize = 20.sp,
                             fontWeight = FontWeight.Bold,
@@ -1547,7 +1397,7 @@ fun SettingsScreen(
                         )
                         Spacer(modifier = Modifier.height(4.dp))
                         Text(
-                            text = "Reward Tokens",
+                            text = "Reward Rupees",
                             color = appCaptionText(),
                             fontSize = 11.sp,
                             fontWeight = FontWeight.Medium
@@ -1577,7 +1427,7 @@ fun SettingsScreen(
                             .background(appSuccessContainer())
                             .padding(10.dp)
                     ) {
-                        Text("✓ You have successfully redeemed a code and earned +100 tokens!", color = appSuccessColor(), fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                        Text("✓ You have successfully redeemed a code and earned +100 rupees!", color = appSuccessColor(), fontSize = 11.sp, fontWeight = FontWeight.Bold)
                     }
                 } else {
                     Row(
@@ -1601,7 +1451,7 @@ fun SettingsScreen(
                                 if (redeemCodeFieldSetting.isBlank()) {
                                     Toast.makeText(context, "Please enter a code to redeem.", Toast.LENGTH_SHORT).show()
                                 } else if (viewModel?.redeemPromoCode(redeemCodeFieldSetting) == true) {
-                                    Toast.makeText(context, "Successful! Received +100 bonus tokens.", Toast.LENGTH_LONG).show()
+                                    Toast.makeText(context, "Successful! Received +100 bonus rupees.", Toast.LENGTH_LONG).show()
                                     redeemCodeFieldSetting = ""
                                 } else {
                                     Toast.makeText(context, "Cannot redeem code. Make sure it is not your own code.", Toast.LENGTH_SHORT).show()

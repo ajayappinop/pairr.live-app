@@ -55,6 +55,9 @@ fun ChatScreen(
         ?: thread?.participantAvatarUrl
         ?: "https://i.pravatar.cc/150?u=$threadId"
     val isOnline = thread?.isOnline == true
+    val modelCanReply = !isModelSide || (
+        thread?.userId?.let { viewModel.canModelChatWithUser(it) } == true
+    )
 
     var inputText by remember { mutableStateOf("") }
     val listState = rememberLazyListState()
@@ -177,10 +180,14 @@ fun ChatScreen(
                 ) {
                     OutlinedTextField(
                         value = inputText,
-                        onValueChange = { inputText = it },
+                        onValueChange = { if (modelCanReply) inputText = it },
+                        enabled = modelCanReply,
                         modifier = Modifier.weight(1f),
                         placeholder = {
-                            Text("Type a message…", color = textColor.copy(alpha = 0.45f))
+                            Text(
+                                if (modelCanReply) "Type a message…" else "Waiting for user to message first…",
+                                color = textColor.copy(alpha = 0.45f)
+                            )
                         },
                         shape = RoundedCornerShape(24.dp),
                         colors = OutlinedTextFieldDefaults.colors(
@@ -196,11 +203,12 @@ fun ChatScreen(
                     Spacer(modifier = Modifier.width(10.dp))
                     IconButton(
                         onClick = {
-                            if (inputText.isNotBlank()) {
+                            if (inputText.isNotBlank() && modelCanReply) {
                                 viewModel.sendMessage(threadId, inputText, !isModelSide)
                                 inputText = ""
                             }
                         },
+                        enabled = modelCanReply,
                         modifier = Modifier
                             .size(48.dp)
                             .background(pinkGradient, CircleShape)

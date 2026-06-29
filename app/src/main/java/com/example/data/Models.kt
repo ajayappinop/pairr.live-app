@@ -1,40 +1,55 @@
 package com.example.data
 
-const val SAMPLE_INTRO_VIDEO_1 =
-    "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4"
-const val SAMPLE_INTRO_VIDEO_2 =
-    "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerEscapes.mp4"
-const val SAMPLE_INTRO_VIDEO_3 =
-    "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerJoyrides.mp4"
-const val SAMPLE_INTRO_VIDEO_4 =
-    "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerMeltdowns.mp4"
-
 fun modelGalleryImageUrl(modelId: String, index: Int): String =
     "https://picsum.photos/seed/pairr_${modelId}_$index/600/800"
 
-fun defaultModelImageUrls(modelId: String, count: Int = 5): List<String> =
-    (1..count.coerceIn(1, 5)).map { modelGalleryImageUrl(modelId, it) }
+fun defaultModelProfilePhotoUrl(modelId: String): String =
+    modelGalleryImageUrl(modelId, 1)
 
-fun AppModel.storedImageUrls(): List<String> = imageUrls.take(5)
+fun AppModel.storedImageUrls(): List<String> = emptyList()
 
 fun AppModel.displayImageUrls(): List<String> =
-    storedImageUrls().ifEmpty { defaultModelImageUrls(id) }
+    displayProfilePhotoUrl().takeIf { it.isNotBlank() }?.let { listOf(it) } ?: emptyList()
 
-fun AppModel.displayIntroVideoUrl(): String? =
-    introVideoUrl?.takeIf { it.isNotBlank() }
+fun AppModel.displayIntroVideoUrl(): String? = null
 
 fun AppModel.displayProfilePhotoUrl(): String =
     profilePhotoUrl?.takeIf { it.isNotBlank() }
-        ?: storedImageUrls().firstOrNull()
-        ?: displayImageUrls().firstOrNull()
         ?: "https://i.pravatar.cc/600?u=$id"
 
-/** Image shown on user-facing cards when the model has no intro video. */
+/** Image shown on user-facing cards and lists. */
 fun AppModel.displayCardImageUrl(): String = displayProfilePhotoUrl()
 
 /** Public handle shown to users — never the model's real full name. */
 fun AppModel.publicUsername(): String =
     username.takeIf { it.isNotBlank() } ?: "model_$id"
+
+/** Public handle shown to models and in calls — never the user's real full name. */
+fun UserProfile.publicUsername(): String =
+    username.takeIf { it.isNotBlank() } ?: name.takeIf { it.isNotBlank() }?.lowercase()?.replace(" ", "_")
+        ?: "user_${id.substringBefore("@").take(8)}"
+
+/** Sort order for home browse list: Online → Offline → Busy. */
+fun AppModel.browseSortOrder(): Int = when (status) {
+    "Online" -> 0
+    "Offline" -> 1
+    "Busy" -> 2
+    else -> 3
+}
+
+/** Only online models can receive calls from the browse feed or detail screen. */
+fun AppModel.canTalkNow(): Boolean = status == "Online"
+
+fun formatReviewCount(count: Int): String = when {
+    count >= 1_000_000 -> "${count / 1_000_000}M+"
+    count >= 1_000 -> "${count / 1_000}K+"
+    else -> count.toString()
+}
+
+fun List<String>.browseLanguageLabel(): String =
+    joinToString(" - ") { lang ->
+        lang.split(" ").firstOrNull()?.take(3)?.replaceFirstChar { it.uppercase() } ?: lang
+    }.ifBlank { "—" }
 
 data class AppModel(
     val id: String = "",
@@ -70,8 +85,7 @@ val mockModels = listOf(
         rating = 4.8f,
         reviewsCount = 120,
         status = "Online",
-        imageUrls = defaultModelImageUrls("1"),
-        introVideoUrl = SAMPLE_INTRO_VIDEO_1
+        profilePhotoUrl = defaultModelProfilePhotoUrl("1")
     ),
     AppModel(
         id = "2",
@@ -87,8 +101,7 @@ val mockModels = listOf(
         rating = 4.5f,
         reviewsCount = 85,
         status = "Offline",
-        imageUrls = defaultModelImageUrls("2", 4),
-        introVideoUrl = SAMPLE_INTRO_VIDEO_2
+        profilePhotoUrl = defaultModelProfilePhotoUrl("2")
     ),
     AppModel(
         id = "3",
@@ -104,8 +117,7 @@ val mockModels = listOf(
         rating = 4.9f,
         reviewsCount = 200,
         status = "Busy",
-        imageUrls = defaultModelImageUrls("3"),
-        introVideoUrl = SAMPLE_INTRO_VIDEO_3
+        profilePhotoUrl = defaultModelProfilePhotoUrl("3")
     ),
     AppModel(
         id = "4",
@@ -121,8 +133,7 @@ val mockModels = listOf(
         rating = 4.7f,
         reviewsCount = 45,
         status = "Online",
-        imageUrls = defaultModelImageUrls("4", 3),
-        introVideoUrl = SAMPLE_INTRO_VIDEO_4
+        profilePhotoUrl = defaultModelProfilePhotoUrl("4")
     )
 )
 
@@ -209,6 +220,7 @@ private fun Int.formatCompactDivisor(divisor: Double, suffix: String): String {
 data class UserProfile(
     val id: String,
     val name: String,
+    val username: String = "",
     val avatarUrl: String,
     val bio: String = "",
     val age: Int = 0,

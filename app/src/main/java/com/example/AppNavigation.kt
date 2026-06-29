@@ -1,12 +1,17 @@
 package com.example
 
 import android.net.Uri
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -34,15 +39,15 @@ fun PairrApp(viewModel: MainViewModel) {
                         popUpTo("login") { inclusive = true }
                     }
                 },
-                onSignUpClick = {
-                    navController.navigate("signup")
+                onModelRegistrationClick = {
+                    navController.navigate("model_registration")
                 }
             )
         }
-        composable("signup") {
-            SignUpScreen(
+        composable("model_registration") {
+            ModelRegistrationScreen(
                 viewModel = viewModel,
-                onSignUpSuccess = {
+                onRegistrationSuccess = {
                     navController.navigate("main") {
                         popUpTo("login") { inclusive = true }
                     }
@@ -58,14 +63,14 @@ fun PairrApp(viewModel: MainViewModel) {
                 onModelClick = { modelId ->
                     navController.navigate("model_detail/$modelId")
                 },
+                onCall = { modelId, isVideo ->
+                    navController.navigate("call/$modelId/$isVideo")
+                },
                 onViewMoreTransactions = {
                     navController.navigate("transactions")
                 },
                 onViewPackages = { initialFilter ->
                     navController.navigate("packages/$initialFilter")
-                },
-                onViewAll = {
-                    navController.navigate("view_all")
                 },
                 onLogout = {
                     viewModel.logout()
@@ -76,20 +81,8 @@ fun PairrApp(viewModel: MainViewModel) {
                 onUserClick = { userId ->
                     navController.navigate("user_detail/${Uri.encode(userId)}")
                 },
-                onRandomPeerCall = { userId ->
-                    navController.navigate("peer_call/${Uri.encode(userId)}")
-                },
                 onViewAllCallEarnings = {
                     navController.navigate("model_call_earnings")
-                }
-            )
-        }
-        composable("view_all") {
-            ViewAllModelsScreen(
-                viewModel = viewModel,
-                onBack = { navController.popBackStack() },
-                onModelClick = { modelId ->
-                    navController.navigate("model_detail/$modelId")
                 }
             )
         }
@@ -122,8 +115,34 @@ fun PairrApp(viewModel: MainViewModel) {
                 userId = userId,
                 viewModel = viewModel,
                 onBack = { navController.popBackStack() },
-                onChat = { navController.popBackStack() }
+                onChat = { chatUserId ->
+                    navController.navigate("user_chat/${Uri.encode(chatUserId)}")
+                }
             )
+        }
+        composable("user_chat/{userId}") { backStackEntry ->
+            val userId = backStackEntry.arguments?.getString("userId")?.let { Uri.decode(it) } ?: ""
+            val thread = viewModel.getThreadWithUser(userId)
+            val canChat = userId.isNotBlank() && viewModel.canModelChatWithUser(userId)
+
+            if (thread != null && canChat) {
+                val participantName = thread.userName.ifBlank {
+                    viewModel.getUserPublicUsername(userId)
+                }
+                ChatScreen(
+                    threadId = thread.id,
+                    participantName = participantName,
+                    isModelSide = true,
+                    showBackButton = true,
+                    onBack = { navController.popBackStack() },
+                    viewModel = viewModel,
+                    participantAvatarUrl = thread.userAvatarUrl
+                )
+            } else {
+                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    Text("Chat unavailable", color = MaterialTheme.colorScheme.onSurface)
+                }
+            }
         }
         composable("model_detail/{modelId}") { backStackEntry ->
             val modelId = backStackEntry.arguments?.getString("modelId")
@@ -148,14 +167,6 @@ fun PairrApp(viewModel: MainViewModel) {
             CallScreen(
                 modelId = modelId,
                 isVideo = isVideo,
-                viewModel = viewModel,
-                onEndCall = { navController.popBackStack() }
-            )
-        }
-        composable("peer_call/{userId}") { backStackEntry ->
-            val userId = backStackEntry.arguments?.getString("userId")?.let { Uri.decode(it) }
-            PeerVideoCallScreen(
-                peerUserId = userId,
                 viewModel = viewModel,
                 onEndCall = { navController.popBackStack() }
             )

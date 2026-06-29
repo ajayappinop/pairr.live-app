@@ -51,13 +51,12 @@ import com.example.ui.theme.isAppDarkTheme
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun SignUpScreen(
+fun ModelRegistrationScreen(
     viewModel: com.example.MainViewModel? = null,
-    onSignUpSuccess: () -> Unit,
+    onRegistrationSuccess: () -> Unit,
     onBack: () -> Unit
 ) {
     val context = LocalContext.current
-    var isModel by remember { mutableStateOf(false) }
     var name by remember { mutableStateOf("") }
     var gender by remember { mutableStateOf("Male") }
     var age by remember { mutableStateOf("") }
@@ -123,72 +122,17 @@ fun SignUpScreen(
             
             Column(modifier = Modifier.fillMaxWidth()) {
                 Text(
-                    text = "Create Account ✨",
+                    text = "Become a Model ✨",
                     color = textColor,
                     fontSize = 24.sp,
                     fontWeight = FontWeight.Bold
                 )
                 Spacer(modifier = Modifier.height(8.dp))
                 Text(
-                    text = "Join Pairr.live and start connecting.",
+                    text = "Create your model profile and start earning on Pairr.live.",
                     color = secondaryTextColor,
                     fontSize = 14.sp
                 )
-            }
-            
-            Spacer(modifier = Modifier.height(24.dp))
-            
-            // User / Model Toggle
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(48.dp)
-                    .then(
-                        if (!isDarkTheme) {
-                            Modifier.shadow(
-                                4.dp,
-                                RoundedCornerShape(24.dp),
-                                ambientColor = LightShadow,
-                                spotColor = Color.Black.copy(alpha = 0.06f)
-                            )
-                        } else Modifier
-                    )
-                    .clip(RoundedCornerShape(24.dp))
-                    .background(inputBg)
-                    .border(1.dp, borderColor, RoundedCornerShape(24.dp)),
-            ) {
-                Box(
-                    modifier = Modifier
-                        .weight(1f)
-                        .fillMaxHeight()
-                        .clip(RoundedCornerShape(24.dp))
-                        .background(if (!isModel) PinkPrimary else Color.Transparent)
-                        .clickable { isModel = false },
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        "I am a User",
-                        color = if (!isModel) Color.White else textColor,
-                        fontWeight = if (!isModel) FontWeight.Bold else FontWeight.Medium,
-                        fontSize = 14.sp
-                    )
-                }
-                Box(
-                    modifier = Modifier
-                        .weight(1f)
-                        .fillMaxHeight()
-                        .clip(RoundedCornerShape(24.dp))
-                        .background(if (isModel) PinkPrimary else Color.Transparent)
-                        .clickable { isModel = true },
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        "I am a Model",
-                        color = if (isModel) Color.White else textColor,
-                        fontWeight = if (isModel) FontWeight.Bold else FontWeight.Medium,
-                        fontSize = 14.sp
-                    )
-                }
             }
             
             Spacer(modifier = Modifier.height(24.dp))
@@ -329,8 +273,7 @@ fun SignUpScreen(
             
             Spacer(modifier = Modifier.height(16.dp))
             
-            if (isModel) {
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                     OutlinedTextField(
                         value = audioRate,
                         onValueChange = { 
@@ -387,7 +330,6 @@ fun SignUpScreen(
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(it, color = MaterialTheme.colorScheme.error, fontSize = 12.sp)
                 }
-            }
             
             Spacer(modifier = Modifier.height(32.dp))
             
@@ -409,20 +351,18 @@ fun SignUpScreen(
                         ageError = null
                     }
 
-                    if (isModel) {
-                        if (audioRate.isBlank()) {
-                            audioRateError = "Required"
-                            isValid = false
-                        } else {
-                            audioRateError = null
-                        }
-                        
-                        if (videoRate.isBlank()) {
-                            videoRateError = "Required"
-                            isValid = false
-                        } else {
-                            videoRateError = null
-                        }
+                    if (audioRate.isBlank()) {
+                        audioRateError = "Required"
+                        isValid = false
+                    } else {
+                        audioRateError = null
+                    }
+                    
+                    if (videoRate.isBlank()) {
+                        videoRateError = "Required"
+                        isValid = false
+                    } else {
+                        videoRateError = null
                     }
 
                     if (phone.isBlank()) {
@@ -448,18 +388,18 @@ fun SignUpScreen(
                         otpError = null
                     }
 
-                    if (isModel && kycUri == null) {
-                        kycError = "KYC document required for registering as a Model"
+                    if (kycUri == null) {
+                        kycError = "KYC document required for model registration"
                         isValid = false
                     } else {
                         kycError = null
                     }
 
                     if (isValid) {
-                        viewModel?.registerUser(name, phone, "dummy_password", isModel, gender, age, audioRate, videoRate) { success, errorMsg ->
+                        viewModel?.registerModel(name, phone, gender, age, audioRate, videoRate) { success, errorMsg ->
                             if (success) {
-                                Toast.makeText(context, "Account Created Successfully! Welcome to Pairr.", Toast.LENGTH_LONG).show()
-                                onSignUpSuccess()
+                                Toast.makeText(context, "Model account created! Welcome to Pairr.", Toast.LENGTH_LONG).show()
+                                onRegistrationSuccess()
                             } else {
                                 Toast.makeText(context, errorMsg ?: "Registration failed", Toast.LENGTH_LONG).show()
                             }
@@ -490,53 +430,12 @@ fun SignUpScreen(
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
-                        text = "Sign Up",
+                        text = "Create Model Account",
                         color = Color.White,
                         fontSize = 18.sp,
                         fontWeight = FontWeight.SemiBold
                     )
                 }
-            }
-            
-            Spacer(modifier = Modifier.height(32.dp))
-            
-            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-                HorizontalDivider(modifier = Modifier.weight(1f), color = borderColor)
-                Text(
-                    text = "or register with",
-                    color = secondaryTextColor,
-                    fontSize = 14.sp,
-                    modifier = Modifier.padding(horizontal = 16.dp)
-                )
-                HorizontalDivider(modifier = Modifier.weight(1f), color = borderColor)
-            }
-            
-            Spacer(modifier = Modifier.height(24.dp))
-            
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(16.dp)
-            ) {
-                AuthSocialButton(
-                    provider = SocialProvider.Google,
-                    label = "Google",
-                    modifier = Modifier
-                        .weight(1f)
-                        .clickable {
-                            Toast.makeText(context, "Signed up via Google successfully! Welcome.", Toast.LENGTH_SHORT).show()
-                            onSignUpSuccess()
-                        }
-                )
-                AuthSocialButton(
-                    provider = SocialProvider.Facebook,
-                    label = "Facebook",
-                    modifier = Modifier
-                        .weight(1f)
-                        .clickable {
-                            Toast.makeText(context, "Signed up via Facebook successfully! Welcome.", Toast.LENGTH_SHORT).show()
-                            onSignUpSuccess()
-                        }
-                )
             }
             
             Spacer(modifier = Modifier.height(32.dp))
@@ -547,10 +446,10 @@ fun SignUpScreen(
                     .clickable { onBack() },
                 text = buildAnnotatedString {
                     withStyle(style = SpanStyle(color = secondaryTextColor)) {
-                        append("Already have an account? ")
+                        append("Already registered? ")
                     }
                     withStyle(style = SpanStyle(color = PinkPrimary, fontWeight = FontWeight.Bold)) {
-                        append("Login")
+                        append("Log in with your phone")
                     }
                 },
                 fontSize = 14.sp

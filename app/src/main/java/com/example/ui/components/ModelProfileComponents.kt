@@ -32,11 +32,8 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.UploadFile
 import com.example.data.displayCardImageUrl
-import com.example.data.displayImageUrls
-import com.example.data.displayIntroVideoUrl
 import com.example.data.displayProfilePhotoUrl
 import com.example.data.publicUsername
-import com.example.data.storedImageUrls
 import com.example.ui.theme.OrangeSecondary
 import com.example.ui.theme.PinkPrimary
 
@@ -45,31 +42,17 @@ fun ModelCardMedia(
     model: AppModel,
     modifier: Modifier = Modifier,
     contentScale: ContentScale = ContentScale.Crop,
-    /** When true, always show profile/first photo (for home lists & story rings). */
-    useProfilePhotoOnly: Boolean = false
+    @Suppress("UNUSED_PARAMETER") useProfilePhotoOnly: Boolean = false
 ) {
-    val introVideo = if (useProfilePhotoOnly) null else model.displayIntroVideoUrl()
     val cardImage = model.displayCardImageUrl()
     val displayName = model.publicUsername()
 
-    Box(modifier = modifier) {
-        AsyncImage(
-            model = cardImage,
-            contentDescription = displayName,
-            modifier = Modifier.fillMaxSize(),
-            contentScale = contentScale
-        )
-        if (introVideo != null) {
-            VideoPlayer(
-                videoUrl = introVideo,
-                modifier = Modifier.fillMaxSize(),
-                autoPlay = true,
-                loop = true,
-                muted = true,
-                useController = false
-            )
-        }
-    }
+    AsyncImage(
+        model = cardImage,
+        contentDescription = displayName,
+        modifier = modifier.fillMaxSize(),
+        contentScale = contentScale
+    )
 }
 
 @Composable
@@ -78,7 +61,7 @@ fun ModelStoryCircle(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     size: Dp = 76.dp,
-    showLiveBadge: Boolean = true
+    showOnlineIndicator: Boolean = true
 ) {
     val storyRingGradient = Brush.linearGradient(listOf(PinkPrimary, OrangeSecondary, PinkPrimary))
     val imageUrl = model.displayCardImageUrl()
@@ -111,17 +94,19 @@ fun ModelStoryCircle(
                 )
             }
 
-            if (showLiveBadge && model.status == "Online") {
+            if (showOnlineIndicator && model.status == "Online") {
                 Box(
                     modifier = Modifier
-                        .align(Alignment.BottomCenter)
-                        .offset(y = 6.dp)
-                        .clip(RoundedCornerShape(6.dp))
-                        .background(Color(0xFFFF5252))
-                        .padding(horizontal = 7.dp, vertical = 2.dp)
-                ) {
-                    Text("LIVE", color = Color.White, fontSize = 8.sp, fontWeight = FontWeight.Black)
-                }
+                        .align(Alignment.BottomEnd)
+                        .offset(x = 2.dp, y = 2.dp)
+                        .size(14.dp)
+                        .clip(CircleShape)
+                        .background(MaterialTheme.colorScheme.background)
+                        .padding(2.dp)
+                        .clip(CircleShape)
+                        .background(Color(0xFF4CAF50))
+                        .border(1.5.dp, MaterialTheme.colorScheme.background, CircleShape)
+                )
             }
         }
 
@@ -137,7 +122,7 @@ fun ModelStoryCircle(
             modifier = Modifier.width(size + 12.dp)
         )
         Text(
-            text = model.categories.firstOrNull() ?: "Live",
+            text = model.status,
             color = secondaryText,
             fontSize = 10.sp,
             maxLines = 1,
@@ -206,84 +191,8 @@ private fun RateChip(
         Icon(icon, contentDescription = label, tint = accent, modifier = Modifier.size(22.dp))
         Spacer(modifier = Modifier.height(6.dp))
         Text("$price", color = textColor, fontSize = 22.sp, fontWeight = FontWeight.Bold)
-        Text("Tokens / min", color = textColor.copy(alpha = 0.55f), fontSize = 11.sp)
+        Text("Rupees / min", color = textColor.copy(alpha = 0.55f), fontSize = 11.sp)
         Text(label, color = accent, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
-    }
-}
-
-@Composable
-fun ModelImageGridGallery(
-    imageUrls: List<String>,
-    modifier: Modifier = Modifier,
-    onImageClick: ((String, Int) -> Unit)? = null
-) {
-    val images = imageUrls.take(5)
-    if (images.isEmpty()) return
-
-    val columns = 2
-    Column(
-        modifier = modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(8.dp)
-    ) {
-        images.chunked(columns).forEach { rowImages ->
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                rowImages.forEachIndexed { rowIndex, url ->
-                    val globalIndex = images.indexOf(url)
-                    val isFeatured = globalIndex == 0 && images.size > 1
-                    AsyncImage(
-                        model = url,
-                        contentDescription = "Gallery image ${globalIndex + 1}",
-                        modifier = Modifier
-                            .weight(1f)
-                            .aspectRatio(if (isFeatured && rowIndex == 0 && rowImages.size == 1) 1.2f else 1f)
-                            .clip(RoundedCornerShape(14.dp))
-                            .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(14.dp))
-                            .clickable { onImageClick?.invoke(url, globalIndex) },
-                        contentScale = ContentScale.Crop
-                    )
-                }
-                repeat(columns - rowImages.size) {
-                    Spacer(modifier = Modifier.weight(1f))
-                }
-            }
-        }
-    }
-}
-
-@Composable
-fun ModelIntroVideoSection(
-    videoUrl: String,
-    modifier: Modifier = Modifier,
-    height: androidx.compose.ui.unit.Dp = 280.dp
-) {
-    Column(modifier = modifier.fillMaxWidth()) {
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(height)
-                .clip(RoundedCornerShape(bottomStart = 0.dp, bottomEnd = 0.dp))
-        ) {
-            VideoPlayer(
-                videoUrl = videoUrl,
-                modifier = Modifier.fillMaxSize(),
-                autoPlay = true,
-                loop = false,
-                muted = false,
-                useController = true
-            )
-            Box(
-                modifier = Modifier
-                    .align(Alignment.TopStart)
-                    .padding(12.dp)
-                    .background(Color.Black.copy(alpha = 0.45f), RoundedCornerShape(8.dp))
-                    .padding(horizontal = 10.dp, vertical = 4.dp)
-            ) {
-                Text("Intro Video", color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold)
-            }
-        }
     }
 }
 
@@ -293,7 +202,6 @@ fun ModelProfileCardMediaBanner(
     profilePhotoOverride: String? = null,
     modifier: Modifier = Modifier
 ) {
-    val introVideo = model.displayIntroVideoUrl()
     val profilePhoto = profilePhotoOverride?.takeIf { it.isNotBlank() }
         ?: model.displayProfilePhotoUrl()
     val gradient = Brush.verticalGradient(
@@ -306,38 +214,13 @@ fun ModelProfileCardMediaBanner(
             .height(180.dp)
             .clip(RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp))
     ) {
-        if (introVideo != null) {
-            VideoPlayer(
-                videoUrl = introVideo,
-                modifier = Modifier.fillMaxSize(),
-                autoPlay = true,
-                loop = true,
-                muted = true,
-                useController = false
-            )
-        } else {
-            AsyncImage(
-                model = profilePhoto,
-                contentDescription = "Profile photo",
-                modifier = Modifier.fillMaxSize(),
-                contentScale = ContentScale.Crop
-            )
-        }
+        AsyncImage(
+            model = profilePhoto,
+            contentDescription = "Profile photo",
+            modifier = Modifier.fillMaxSize(),
+            contentScale = ContentScale.Crop
+        )
         Box(modifier = Modifier.fillMaxSize().background(gradient))
-        Box(
-            modifier = Modifier
-                .align(Alignment.BottomStart)
-                .padding(12.dp)
-                .background(PinkPrimary.copy(alpha = 0.85f), RoundedCornerShape(8.dp))
-                .padding(horizontal = 10.dp, vertical = 4.dp)
-        ) {
-            Text(
-                text = if (introVideo != null) "▶ Intro" else "Profile",
-                color = Color.White,
-                fontSize = 11.sp,
-                fontWeight = FontWeight.Bold
-            )
-        }
     }
 }
 
@@ -390,217 +273,96 @@ fun FullScreenImageDialog(
 }
 
 @Composable
-fun ModelMediaUploadSection(
-    model: AppModel,
+fun ModelProfilePhotoSection(
+    profilePhotoUrl: String?,
     cardBg: Color,
     borderColor: Color,
     textColor: Color,
     secondaryTextColor: Color,
-    onAddPhoto: () -> Unit,
-    onRemovePhoto: (Int) -> Unit,
-    onUploadVideo: () -> Unit,
-    onRemoveVideo: () -> Unit,
-    onPhotoClick: ((String, Int) -> Unit)? = null,
+    onChangePhoto: () -> Unit,
+    onRemovePhoto: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val photos = model.storedImageUrls()
-    val introVideo = model.displayIntroVideoUrl()
-    val photoSlots: List<String?> = photos.map { it as String? } +
-        if (photos.size < 5) listOf(null) else emptyList()
-
     Column(
         modifier = modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 10.dp)
             .clip(RoundedCornerShape(20.dp))
             .background(cardBg)
             .border(1.dp, borderColor, RoundedCornerShape(20.dp))
             .padding(16.dp)
     ) {
         Text(
-            "Portfolio Media",
+            "Profile Photo",
             color = textColor,
             fontSize = 18.sp,
             fontWeight = FontWeight.Bold
         )
         Text(
-            "Upload up to 5 photos and one intro video for your public profile.",
+            "This photo is shown on your public profile and model detail page.",
             color = secondaryTextColor,
             fontSize = 13.sp,
             lineHeight = 18.sp,
             modifier = Modifier.padding(top = 4.dp, bottom = 16.dp)
         )
 
-        Text(
-            "Introductory Video",
-            color = textColor,
-            fontSize = 14.sp,
-            fontWeight = FontWeight.SemiBold
-        )
-        Spacer(modifier = Modifier.height(8.dp))
-
-        if (introVideo != null) {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(160.dp)
-                    .clip(RoundedCornerShape(14.dp))
-                    .border(1.dp, borderColor, RoundedCornerShape(14.dp))
-            ) {
-                VideoPlayer(
-                    videoUrl = introVideo,
-                    modifier = Modifier.fillMaxSize(),
-                    autoPlay = false,
-                    loop = false,
-                    muted = false,
-                    useController = true
-                )
-            }
-            Spacer(modifier = Modifier.height(10.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                OutlinedButton(
-                    onClick = onUploadVideo,
-                    modifier = Modifier.weight(1f),
-                    shape = RoundedCornerShape(12.dp),
-                    border = androidx.compose.foundation.BorderStroke(1.dp, PinkPrimary)
-                ) {
-                    Icon(Icons.Default.UploadFile, contentDescription = null, tint = PinkPrimary, modifier = Modifier.size(18.dp))
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Text("Change Video", color = PinkPrimary, fontSize = 13.sp)
-                }
-                OutlinedButton(
-                    onClick = onRemoveVideo,
-                    modifier = Modifier.weight(1f),
-                    shape = RoundedCornerShape(12.dp),
-                    border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFFF4D4D))
-                ) {
-                    Icon(Icons.Default.Delete, contentDescription = null, tint = Color(0xFFFF4D4D), modifier = Modifier.size(18.dp))
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Text("Remove", color = Color(0xFFFF4D4D), fontSize = 13.sp)
-                }
-            }
-        } else {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(120.dp)
-                    .clip(RoundedCornerShape(14.dp))
-                    .border(1.dp, borderColor, RoundedCornerShape(14.dp))
-                    .background(textColor.copy(alpha = 0.04f))
-                    .clickable { onUploadVideo() },
-                contentAlignment = Alignment.Center
-            ) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Icon(Icons.Default.UploadFile, contentDescription = null, tint = PinkPrimary, modifier = Modifier.size(32.dp))
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text("Upload Intro Video", color = textColor, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
-                    Text("MP4 recommended", color = secondaryTextColor, fontSize = 12.sp)
-                }
-            }
-        }
-
-        Spacer(modifier = Modifier.height(20.dp))
-        HorizontalDivider(color = borderColor)
-        Spacer(modifier = Modifier.height(16.dp))
-
         Row(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Text(
-                "Profile Photos (${photos.size}/5)",
-                color = textColor,
-                fontSize = 14.sp,
-                fontWeight = FontWeight.SemiBold
-            )
-            if (photos.size < 5) {
-                TextButton(onClick = onAddPhoto) {
-                    Icon(Icons.Default.Add, contentDescription = null, tint = PinkPrimary, modifier = Modifier.size(18.dp))
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text("Add Photo", color = PinkPrimary, fontWeight = FontWeight.Bold, fontSize = 13.sp)
-                }
-            }
-        }
-
-        Spacer(modifier = Modifier.height(10.dp))
-
-        if (photos.isEmpty()) {
             Box(
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .height(100.dp)
-                    .clip(RoundedCornerShape(14.dp))
-                    .border(1.dp, borderColor, RoundedCornerShape(14.dp))
-                    .background(textColor.copy(alpha = 0.04f))
-                    .clickable { onAddPhoto() },
+                    .size(96.dp)
+                    .clip(CircleShape)
+                    .border(2.dp, borderColor, CircleShape)
+                    .background(textColor.copy(alpha = 0.05f)),
                 contentAlignment = Alignment.Center
             ) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Icon(Icons.Default.Add, contentDescription = null, tint = PinkPrimary, modifier = Modifier.size(28.dp))
-                    Spacer(modifier = Modifier.height(6.dp))
-                    Text("Add your first photo", color = secondaryTextColor, fontSize = 13.sp)
+                if (!profilePhotoUrl.isNullOrBlank()) {
+                    AsyncImage(
+                        model = profilePhotoUrl,
+                        contentDescription = "Profile photo",
+                        modifier = Modifier.fillMaxSize(),
+                        contentScale = ContentScale.Crop
+                    )
+                } else {
+                    Icon(
+                        Icons.Default.Add,
+                        contentDescription = null,
+                        tint = PinkPrimary,
+                        modifier = Modifier.size(32.dp)
+                    )
                 }
             }
-        } else {
-            val columns = 3
-            photoSlots.chunked(columns).forEach { rowItems ->
-                Row(
+
+            Spacer(modifier = Modifier.width(16.dp))
+
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                OutlinedButton(
+                    onClick = onChangePhoto,
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    shape = RoundedCornerShape(12.dp),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, PinkPrimary),
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = PinkPrimary)
                 ) {
-                    rowItems.forEach { item ->
-                        if (item == null) {
-                            Box(
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .aspectRatio(1f)
-                                    .clip(RoundedCornerShape(12.dp))
-                                    .border(1.dp, PinkPrimary.copy(alpha = 0.5f), RoundedCornerShape(12.dp))
-                                    .background(PinkPrimary.copy(alpha = 0.08f))
-                                    .clickable { onAddPhoto() },
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Icon(Icons.Default.Add, contentDescription = "Add photo", tint = PinkPrimary, modifier = Modifier.size(28.dp))
-                            }
-                        } else {
-                            val index = photos.indexOf(item)
-                            Box(
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .aspectRatio(1f)
-                                    .clip(RoundedCornerShape(12.dp))
-                                    .border(1.dp, borderColor, RoundedCornerShape(12.dp))
-                                    .clickable { onPhotoClick?.invoke(item, index) }
-                            ) {
-                                AsyncImage(
-                                    model = item,
-                                    contentDescription = "Photo ${index + 1}",
-                                    modifier = Modifier.fillMaxSize(),
-                                    contentScale = ContentScale.Crop
-                                )
-                                IconButton(
-                                    onClick = { onRemovePhoto(index) },
-                                    modifier = Modifier
-                                        .align(Alignment.TopEnd)
-                                        .size(32.dp)
-                                        .background(Color.Black.copy(alpha = 0.55f), RoundedCornerShape(8.dp))
-                                ) {
-                                    Icon(
-                                        Icons.Default.Delete,
-                                        contentDescription = "Remove photo",
-                                        tint = Color.White,
-                                        modifier = Modifier.size(16.dp)
-                                    )
-                                }
-                            }
-                        }
-                    }
-                    repeat(columns - rowItems.size) {
-                        Spacer(modifier = Modifier.weight(1f))
-                    }
+                    Icon(Icons.Default.UploadFile, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text("Change Photo", fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
                 }
-                Spacer(modifier = Modifier.height(8.dp))
+                OutlinedButton(
+                    onClick = onRemovePhoto,
+                    enabled = !profilePhotoUrl.isNullOrBlank(),
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFFF4D4D)),
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFFFF4D4D))
+                ) {
+                    Icon(Icons.Default.Delete, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text("Remove Photo", fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                }
             }
         }
     }

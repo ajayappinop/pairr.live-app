@@ -66,7 +66,7 @@ fun ModelSideHistoryScreen(
         ) {
             items(mockHistory) { info ->
                 val isVideo = info.third
-                val amount = if (isVideo) "+150 Tokens" else "+60 Tokens"
+                val amount = if (isVideo) "+150 Rupees" else "+60 Rupees"
                 val userId = viewModel.resolveUserIdByDisplayName(info.first)
                 val avatarUrl = "https://i.pravatar.cc/150?u=$userId"
                 Row(

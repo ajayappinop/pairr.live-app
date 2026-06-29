@@ -15,7 +15,7 @@ import androidx.compose.material.icons.filled.CallEnd
 import androidx.compose.material.icons.filled.Cameraswitch
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.MicOff
-import androidx.compose.material.icons.filled.MonetizationOn
+import androidx.compose.material.icons.filled.CurrencyRupee
 import androidx.compose.material.icons.filled.ReportProblem
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.StarBorder
@@ -60,6 +60,7 @@ fun CallScreen(
     val wallet by viewModel.walletState.collectAsStateWithLifecycle()
     
     var timeElapsed by remember { mutableStateOf(0) }
+    var tokensSpent by remember { mutableStateOf(0) }
     var isMuted by remember { mutableStateOf(false) }
     var isCameraOff by remember { mutableStateOf(false) }
     var showRatingPrompt by remember { mutableStateOf(false) }
@@ -76,7 +77,9 @@ fun CallScreen(
             timeElapsed++
             if (timeElapsed % 60 == 0) {
                 val success = viewModel.deductTokens(pricePerMinute, isVideo)
-                if (!success) {
+                if (success) {
+                    tokensSpent += pricePerMinute
+                } else {
                     showRatingPrompt = true
                 }
             }
@@ -192,7 +195,7 @@ fun CallScreen(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Icon(
-                            Icons.Default.MonetizationOn, 
+                            Icons.Default.CurrencyRupee, 
                             contentDescription = null, 
                             tint = Color(0xFFFFD700), 
                             modifier = Modifier.size(16.dp)
@@ -200,7 +203,7 @@ fun CallScreen(
                         Spacer(modifier = Modifier.width(8.dp))
                         val typeBalance = if (isVideo) wallet.videoBalance else wallet.audioBalance
                         Text(
-                            text = "$typeBalance Tokens", 
+                            text = "$typeBalance Rupees", 
                             color = Color.White, 
                             fontSize = 14.sp, 
                             fontWeight = FontWeight.Bold
@@ -312,15 +315,25 @@ fun CallScreen(
                     var feedbackText by remember { mutableStateOf("") }
                     val verticalScroll = rememberScrollState()
                     val horizontalScroll = rememberScrollState()
+                    val tokenTypeLabel = if (isVideo) "Video" else "Audio"
                     
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .heightIn(max = 360.dp)
+                            .heightIn(max = 420.dp)
                             .verticalScroll(verticalScroll),
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
                         Spacer(modifier = Modifier.height(12.dp))
+
+                        CallSessionSummaryCard(
+                            durationLabel = formattedTime,
+                            tokensSpent = tokensSpent,
+                            tokenTypeLabel = tokenTypeLabel,
+                            textColor = dialogText
+                        )
+                        
+                        Spacer(modifier = Modifier.height(16.dp))
                         
                         // Star rating selectors
                         Row(
@@ -433,6 +446,76 @@ fun CallScreen(
                 callIsVideo = isVideo,
                 onDismiss = { showReportDialog = false }
             )
+        }
+    }
+}
+
+@Composable
+private fun CallSessionSummaryCard(
+    durationLabel: String,
+    tokensSpent: Int,
+    tokenTypeLabel: String,
+    textColor: Color
+) {
+    Surface(
+        color = appSubtleFill(),
+        shape = RoundedCornerShape(12.dp),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 14.dp, horizontal = 16.dp),
+            horizontalArrangement = Arrangement.SpaceEvenly,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                modifier = Modifier.weight(1f)
+            ) {
+                Text(
+                    text = "Call Duration",
+                    color = appCaptionText(),
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Medium
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = durationLabel,
+                    color = textColor,
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+
+            VerticalDivider(
+                modifier = Modifier.height(40.dp),
+                color = appMutedText().copy(alpha = 0.3f)
+            )
+
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                modifier = Modifier.weight(1f)
+            ) {
+                Text(
+                    text = "Rupees Spent",
+                    color = appCaptionText(),
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Medium
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = tokensSpent.toString(),
+                    color = PinkPrimary,
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.Bold
+                )
+                Text(
+                    text = "$tokenTypeLabel Rupees",
+                    color = appSecondaryText(),
+                    fontSize = 11.sp
+                )
+            }
         }
     }
 }

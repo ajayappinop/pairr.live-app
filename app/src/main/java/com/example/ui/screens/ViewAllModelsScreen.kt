@@ -30,6 +30,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.MainViewModel
 import com.example.data.AppModel
+import com.example.data.browseSortOrder
 import com.example.data.publicUsername
 import com.example.ui.components.ModelCardMedia
 import com.example.ui.theme.OrangeSecondary
@@ -67,28 +68,21 @@ fun ViewAllModelsScreen(
         allModels.filter { model -> blockedUsers.none { it.id == model.id } }
     }
 
-    val categories = remember(visibleModels) {
-        listOf("All") + visibleModels.flatMap { it.categories }.distinct().sorted()
-    }
-
     val filteredModels = remember(visibleModels, searchQuery, selectedFilter) {
         visibleModels
             .filter { model ->
                 val matchesSearch = searchQuery.isBlank() ||
                     model.publicUsername().contains(searchQuery, ignoreCase = true) ||
-                    model.categories.any { it.contains(searchQuery, ignoreCase = true) } ||
                     model.bio.contains(searchQuery, ignoreCase = true)
                 val matchesFilter = when (selectedFilter) {
                     "All" -> true
                     "Online" -> model.status == "Online"
-                    "Featured" -> model.isFeatured
-                    else -> model.categories.contains(selectedFilter)
+                    else -> true
                 }
                 matchesSearch && matchesFilter
             }
             .sortedWith(
-                compareByDescending<AppModel> { it.isFeatured }
-                    .thenByDescending { it.status == "Online" }
+                compareBy<AppModel> { it.browseSortOrder() }
                     .thenByDescending { it.rating }
             )
     }
@@ -150,7 +144,7 @@ fun ViewAllModelsScreen(
                                 .height(52.dp)
                                 .appSoftShadow(RoundedCornerShape(16.dp), elevation = if (isLight) 6.dp else 2.dp),
                             placeholder = {
-                                Text("Search by name, category, or bio…", color = appCaptionText())
+                                Text("Search by name or bio…", color = appCaptionText())
                             },
                             leadingIcon = {
                                 Icon(Icons.Default.Search, contentDescription = "Search", tint = appMutedText())
@@ -163,13 +157,8 @@ fun ViewAllModelsScreen(
                         Spacer(modifier = Modifier.height(14.dp))
 
                         LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            val filters = buildList {
-                                add("All")
-                                add("Online")
-                                add("Featured")
-                                addAll(categories.filter { it != "All" })
-                            }
-                            items(filters.distinct()) { filter ->
+                            val filters = listOf("All", "Online")
+                            items(filters) { filter ->
                                 FilterChip(
                                     selected = selectedFilter == filter,
                                     onClick = { selectedFilter = filter },
@@ -255,18 +244,6 @@ private fun ViewAllModelCard(
             .appSurfaceCard(shape = cardShape, borderWeight = AppBorderWeight.Default)
             .clickable(onClick = onClick)
     ) {
-        if (model.isFeatured) {
-            Box(
-                modifier = Modifier
-                    .align(Alignment.TopStart)
-                    .padding(10.dp)
-                    .background(PinkPrimary, RoundedCornerShape(8.dp))
-                    .padding(horizontal = 8.dp, vertical = 4.dp)
-            ) {
-                Text("★ Featured", color = Color.White, fontSize = 10.sp, fontWeight = FontWeight.Bold)
-            }
-        }
-
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -346,16 +323,6 @@ private fun ViewAllModelCard(
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
                 lineHeight = 16.sp
-            )
-                            
-                            Spacer(modifier = Modifier.height(8.dp))
-                            
-            Text(
-                model.categories.joinToString(" • "),
-                color = PinkPrimary.copy(alpha = 0.85f),
-                fontSize = 11.sp,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
             )
 
             Spacer(modifier = Modifier.height(10.dp))

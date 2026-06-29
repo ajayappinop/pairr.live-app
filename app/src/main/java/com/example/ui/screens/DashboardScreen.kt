@@ -1,117 +1,108 @@
 package com.example.ui.screens
 
-import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.Image
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
-import androidx.compose.material.icons.outlined.*
+import androidx.compose.material.icons.outlined.Notifications
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
+import android.widget.Toast
+import androidx.compose.ui.platform.LocalContext
 import coil.compose.AsyncImage
 import com.example.MainViewModel
-import com.example.R
-import com.example.data.publicUsername
-import com.example.data.formattedBalanceCompact
+import com.example.data.AppModel
 import com.example.data.Wallet
-import com.example.ui.components.ModelCardMedia
+import com.example.data.browseLanguageLabel
+import com.example.data.browseSortOrder
+import com.example.data.canTalkNow
+import com.example.data.displayProfilePhotoUrl
+import com.example.data.formatReviewCount
+import com.example.data.formattedBalanceCompact
+import com.example.data.publicUsername
 import com.example.ui.components.NotificationsSheet
-import com.example.ui.components.ModelStoryCircle
-import com.example.ui.theme.OrangeSecondary
 import com.example.ui.theme.PinkPrimary
 import com.example.ui.theme.SoftScreenBackground
-import com.example.ui.theme.DarkPromoGradients
 import com.example.ui.theme.accentHorizontalGradient
 import com.example.ui.theme.appBorderColor
-import com.example.ui.theme.appSuccessColor
-import com.example.ui.theme.appStarColor
 import com.example.ui.theme.appCaptionText
 import com.example.ui.theme.appMutedText
-import com.example.ui.theme.appOutlinedFieldColors
 import com.example.ui.theme.appSecondaryText
 import com.example.ui.theme.appSoftShadow
+import com.example.ui.theme.appStarColor
+import com.example.ui.theme.appSuccessColor
 import com.example.ui.theme.appSurfaceCard
 import com.example.ui.theme.appTitleText
 import com.example.ui.theme.AppBorderWeight
 import com.example.ui.theme.isAppDarkTheme
 import com.example.ui.theme.isCompactWidth
-import com.example.ui.theme.selectedChipBrush
-
-import androidx.compose.foundation.pager.HorizontalPager
-import androidx.compose.foundation.pager.rememberPagerState
-import androidx.compose.material.icons.filled.PlayCircle
-import androidx.compose.material.icons.filled.School
-import androidx.compose.material.icons.filled.LocalOffer
-import androidx.compose.material.icons.filled.Shuffle
-import androidx.compose.material.icons.filled.Videocam
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.text.style.TextAlign
-import android.widget.Toast
-import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import kotlinx.coroutines.delay
 
 @Composable
 fun DashboardScreen(
     viewModel: MainViewModel,
     onModelClick: (String) -> Unit,
-    onViewAll: () -> Unit,
-    onViewPackages: (String) -> Unit = {},
-    onRandomPeerCall: (String) -> Unit = {}
+    onCall: (String, Boolean) -> Unit
 ) {
     val favorites by viewModel.favorites.collectAsState()
     val allModels by viewModel.models.collectAsState()
     val blockedUsers by viewModel.blockedUsers.collectAsState()
-    
-    var selectedCategory by remember { mutableStateOf("All") }
+
     var searchQuery by remember { mutableStateOf("") }
-    
-    val models = remember(allModels, selectedCategory, searchQuery, blockedUsers) {
-        var filtered = allModels.filter { model -> blockedUsers.none { it.id == model.id } }
-        if (selectedCategory != "All") {
-            filtered = filtered.filter { it.categories.contains(selectedCategory) }
-        }
-        if (searchQuery.isNotEmpty()) {
-            filtered = filtered.filter { it.publicUsername().contains(searchQuery, ignoreCase = true) }
-        }
-        filtered
-    }
-    
-    var showTutorialDialog by remember { mutableStateOf(false) }
     var showNotificationsSheet by remember { mutableStateOf(false) }
-    var showRandomMatching by remember { mutableStateOf(false) }
-    val context = LocalContext.current
     val unreadNotificationCount by viewModel.notifications.collectAsState()
     val unreadCount = unreadNotificationCount.count { !it.isRead }
     val wallet by viewModel.walletState.collectAsStateWithLifecycle()
+    var callOptionsModel by remember { mutableStateOf<AppModel?>(null) }
+    var notifyModel by remember { mutableStateOf<AppModel?>(null) }
+    val context = LocalContext.current
+
+    val browseModels = remember(allModels, searchQuery, blockedUsers) {
+        allModels
+            .filter { model -> blockedUsers.none { it.id == model.id } }
+            .filter { model ->
+                searchQuery.isBlank() ||
+                    model.publicUsername().contains(searchQuery, ignoreCase = true) ||
+                    model.bio.contains(searchQuery, ignoreCase = true)
+            }
+            .sortedWith(
+                compareBy<AppModel> { it.browseSortOrder() }
+                    .thenByDescending { it.rating }
+                    .thenByDescending { it.reviewsCount }
+            )
+    }
 
     SoftScreenBackground {
-        Box(modifier = Modifier.fillMaxSize()) {
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(bottom = 110.dp)
+            contentPadding = PaddingValues(bottom = 110.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             item {
                 TopBarSection(
@@ -121,20 +112,9 @@ fun DashboardScreen(
                     onNotificationsClick = { showNotificationsSheet = true },
                     totalTokenBalance = wallet.formattedBalanceCompact()
                 )
+            }
 
-                Spacer(modifier = Modifier.height(4.dp))
-                HomePromoBannerCarousel(
-                    onViewPackages = onViewPackages,
-                    onShowTutorial = { showTutorialDialog = true }
-                )
-
-                Spacer(modifier = Modifier.height(12.dp))
-                RandomCallHighlightCard(
-                    onClick = { showRandomMatching = true },
-                    modifier = Modifier.padding(horizontal = 18.dp)
-                )
-
-                // Welcome Message
+            item {
                 Column(modifier = Modifier.padding(horizontal = 18.dp, vertical = 8.dp)) {
                     Text(
                         text = "Discover Amazing People",
@@ -150,48 +130,37 @@ fun DashboardScreen(
                         fontWeight = FontWeight.Medium
                     )
                 }
-
-                Spacer(modifier = Modifier.height(16.dp))
-                CategoriesSection(selectedCategory = selectedCategory, onCategorySelected = { selectedCategory = it })
-                
-                SectionHeader("Live Now ✨", "Jump into active sessions", onViewAll = onViewAll)
-                LiveNowSection(models = models.filter { it.status == "Online" }, onModelClick = onModelClick)
-                
-                Spacer(modifier = Modifier.height(24.dp))
-                SectionHeader("Recommended For You ❤️", "Based on your interests", onViewAll = onViewAll)
-                PeopleYouMayLikeSection(
-                    models = models,
-                    favorites = favorites,
-                    onFavoriteToggle = { viewModel.toggleFavorite(it) },
-                    onModelClick = onModelClick
-                )
-                
-                Spacer(modifier = Modifier.height(24.dp))
-                SectionHeader("Popular Communities 🌎", "Join the conversation", onViewAll = onViewAll)
-                PopularRoomsSection()
-                
-                Spacer(modifier = Modifier.height(20.dp))
             }
-        }
 
-            if (showRandomMatching) {
-                RandomCallMatchingOverlay(
-                    viewModel = viewModel,
-                    onMatched = { peerUserId ->
-                        showRandomMatching = false
-                        onRandomPeerCall(peerUserId)
-                    },
-                    onDismiss = {
-                        showRandomMatching = false
-                        Toast.makeText(context, "No users available right now. Try again soon.", Toast.LENGTH_SHORT).show()
+            if (browseModels.isEmpty()) {
+                item {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 18.dp, vertical = 48.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = "No models found",
+                            color = appMutedText(),
+                            fontSize = 15.sp
+                        )
                     }
-                )
+                }
+            } else {
+                items(browseModels, key = { it.id }) { model ->
+                    BrowseModelCard(
+                        model = model,
+                        isFavorite = favorites.contains(model.id),
+                        onFavoriteToggle = { viewModel.toggleFavorite(model.id) },
+                        onClick = { onModelClick(model.id) },
+                        onCallNowClick = { callOptionsModel = model },
+                        onNotifyClick = { notifyModel = model },
+                        modifier = Modifier.padding(horizontal = 18.dp)
+                    )
+                }
             }
         }
-    }
-
-    if (showTutorialDialog) {
-        HomeTutorialDialog(onDismiss = { showTutorialDialog = false })
     }
 
     if (showNotificationsSheet) {
@@ -201,6 +170,604 @@ fun DashboardScreen(
         )
     }
 
+    callOptionsModel?.let { model ->
+        BrowseCallOptionsDialog(
+            model = model,
+            onDismiss = { callOptionsModel = null },
+            onAudioCall = {
+                onCall(model.id, false)
+                callOptionsModel = null
+            },
+            onVideoCall = {
+                onCall(model.id, true)
+                callOptionsModel = null
+            }
+        )
+    }
+
+    notifyModel?.let { model ->
+        BrowseOfflineNotifyDialog(
+            model = model,
+            onDismiss = { notifyModel = null },
+            onSendMessage = { message, requestType ->
+                val threadId = viewModel.ensureChatThread(
+                    modelId = model.id,
+                    modelName = model.publicUsername(),
+                    modelAvatarUrl = model.displayProfilePhotoUrl(),
+                    isOnline = model.status == "Online"
+                )
+                viewModel.sendMessage(threadId, message, isFromUser = true)
+                notifyModel = null
+                val sentLabel = when (requestType) {
+                    OfflineRequestType.Chat -> "Message sent"
+                    OfflineRequestType.Call -> "Call request sent"
+                    OfflineRequestType.VideoCall -> "Video call request sent"
+                }
+                Toast.makeText(context, sentLabel, Toast.LENGTH_SHORT).show()
+            }
+        )
+    }
+}
+
+@Composable
+fun BrowseModelCard(
+    model: AppModel,
+    isFavorite: Boolean,
+    onFavoriteToggle: () -> Unit,
+    onClick: () -> Unit,
+    onCallNowClick: () -> Unit,
+    onNotifyClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val cardShape = RoundedCornerShape(18.dp)
+    val canTalk = model.canTalkNow()
+
+    Box(
+        modifier = modifier
+            .fillMaxWidth()
+            .appSurfaceCard(shape = cardShape, borderWeight = AppBorderWeight.Default)
+            .clickable(onClick = onClick)
+            .padding(14.dp)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.Top
+        ) {
+            Box(
+                modifier = Modifier.size(72.dp),
+                contentAlignment = Alignment.BottomEnd
+            ) {
+                AsyncImage(
+                    model = model.displayProfilePhotoUrl(),
+                    contentDescription = model.publicUsername(),
+                    modifier = Modifier
+                        .size(72.dp)
+                        .clip(CircleShape)
+                        .border(2.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.35f), CircleShape),
+                    contentScale = ContentScale.Crop
+                )
+                BrowseStatusDot(
+                    model = model,
+                    modifier = Modifier
+                        .align(Alignment.BottomEnd)
+                        .offset(x = (-2).dp, y = (-2).dp)
+                )
+            }
+
+            Spacer(modifier = Modifier.width(14.dp))
+
+            Column(modifier = Modifier.weight(1f)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(
+                        modifier = Modifier.weight(1f),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = model.publicUsername(),
+                            color = appTitleText(),
+                            fontSize = 17.sp,
+                            fontWeight = FontWeight.Bold,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.weight(1f, fill = false)
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        AvailabilityBadge(status = model.status)
+                    }
+                    IconButton(
+                        onClick = onFavoriteToggle,
+                        modifier = Modifier.size(32.dp)
+                    ) {
+                        Icon(
+                            imageVector = if (isFavorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
+                            contentDescription = "Favorite",
+                            tint = if (isFavorite) PinkPrimary else appMutedText(),
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+                }
+
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        Icons.Default.Star,
+                        contentDescription = null,
+                        tint = appStarColor(),
+                        modifier = Modifier.size(14.dp)
+                    )
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text(
+                        text = String.format("%.1f", model.rating),
+                        color = appTitleText(),
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                    Text(
+                        text = " (${formatReviewCount(model.reviewsCount)})",
+                        color = appCaptionText(),
+                        fontSize = 12.sp
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(6.dp))
+
+                Text(
+                    text = model.bio,
+                    color = appSecondaryText(),
+                    fontSize = 12.sp,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                    lineHeight = 16.sp
+                )
+
+                Spacer(modifier = Modifier.height(10.dp))
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = model.languages.browseLanguageLabel(),
+                            color = appCaptionText(),
+                            fontSize = 11.sp,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            BrowseRatePill(
+                                icon = Icons.Default.Call,
+                                label = "${model.audioPrice}/min",
+                                tint = appSuccessColor()
+                            )
+                            BrowseRatePill(
+                                icon = Icons.Default.Videocam,
+                                label = "${model.videoPrice}/min",
+                                tint = PinkPrimary
+                            )
+                        }
+                    }
+
+                    if (canTalk) {
+                        OutlinedButton(
+                            onClick = onCallNowClick,
+                            shape = RoundedCornerShape(10.dp),
+                            border = androidx.compose.foundation.BorderStroke(1.5.dp, appSuccessColor()),
+                            colors = ButtonDefaults.outlinedButtonColors(contentColor = appSuccessColor()),
+                            contentPadding = PaddingValues(horizontal = 14.dp, vertical = 0.dp),
+                            modifier = Modifier.height(36.dp)
+                        ) {
+                            Text(
+                                text = "Call Now",
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    } else {
+                        IconButton(
+                            onClick = onNotifyClick,
+                            modifier = Modifier.size(40.dp)
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(40.dp)
+                                    .clip(CircleShape)
+                                    .background(Color(0xFFFFC107).copy(alpha = 0.18f))
+                                    .border(1.dp, Color(0xFFFFC107).copy(alpha = 0.5f), CircleShape),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Outlined.Notifications,
+                                    contentDescription = "Notify",
+                                    tint = Color(0xFFFFC107),
+                                    modifier = Modifier.size(20.dp)
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun BrowseStatusDot(model: AppModel, modifier: Modifier = Modifier) {
+    if (model.status == "Online") {
+        AnimatedOnlineStatusDot(modifier = modifier)
+    }
+}
+
+@Composable
+private fun AnimatedOnlineStatusDot(modifier: Modifier = Modifier) {
+    val onlineColor = appSuccessColor()
+    val infiniteTransition = rememberInfiniteTransition(label = "online_dot_pulse")
+    val pulseScale by infiniteTransition.animateFloat(
+        initialValue = 1f,
+        targetValue = 1.35f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(900, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "online_ring_scale"
+    )
+    val pulseAlpha by infiniteTransition.animateFloat(
+        initialValue = 0.55f,
+        targetValue = 0f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(900, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "online_ring_alpha"
+    )
+    val dotScale by infiniteTransition.animateFloat(
+        initialValue = 1f,
+        targetValue = 1.08f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(900, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "online_dot_scale"
+    )
+
+    Box(
+        modifier = modifier.size(22.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Box(
+            modifier = Modifier
+                .size(18.dp)
+                .scale(pulseScale)
+                .clip(CircleShape)
+                .background(onlineColor.copy(alpha = pulseAlpha))
+        )
+        Box(
+            modifier = Modifier
+                .size(18.dp)
+                .scale(dotScale)
+                .clip(CircleShape)
+                .background(MaterialTheme.colorScheme.surface)
+                .padding(2.5.dp)
+                .clip(CircleShape)
+                .background(onlineColor)
+                .border(2.5.dp, MaterialTheme.colorScheme.surface, CircleShape)
+        )
+    }
+}
+
+@Composable
+private fun BrowseCallOptionsDialog(
+    model: AppModel,
+    onDismiss: () -> Unit,
+    onAudioCall: () -> Unit,
+    onVideoCall: () -> Unit
+) {
+    val cardShape = RoundedCornerShape(22.dp)
+
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(usePlatformDefaultWidth = false)
+    ) {
+        Surface(
+            modifier = Modifier
+                .fillMaxWidth(0.88f)
+                .appSoftShadow(cardShape, elevation = 12.dp),
+            shape = cardShape,
+            color = MaterialTheme.colorScheme.surface,
+            tonalElevation = 6.dp
+        ) {
+            Column(
+                modifier = Modifier.padding(horizontal = 20.dp, vertical = 22.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Text(
+                    text = "Call ${model.publicUsername()}",
+                    color = appTitleText(),
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.Bold,
+                    textAlign = TextAlign.Center
+                )
+                Spacer(modifier = Modifier.height(6.dp))
+                Text(
+                    text = "Choose how you want to connect",
+                    color = appSecondaryText(),
+                    fontSize = 13.sp,
+                    textAlign = TextAlign.Center
+                )
+                Spacer(modifier = Modifier.height(20.dp))
+
+                BrowseCallOptionRow(
+                    icon = Icons.Default.Call,
+                    title = "Audio Call",
+                    subtitle = "${model.audioPrice} rupees/min",
+                    tint = appSuccessColor(),
+                    onClick = onAudioCall
+                )
+                Spacer(modifier = Modifier.height(10.dp))
+                BrowseCallOptionRow(
+                    icon = Icons.Default.Videocam,
+                    title = "Video Call",
+                    subtitle = "${model.videoPrice} rupees/min",
+                    tint = PinkPrimary,
+                    onClick = onVideoCall
+                )
+                Spacer(modifier = Modifier.height(16.dp))
+                TextButton(onClick = onDismiss) {
+                    Text("Cancel", color = appMutedText(), fontWeight = FontWeight.SemiBold)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun BrowseCallOptionRow(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    title: String,
+    subtitle: String,
+    tint: Color,
+    onClick: () -> Unit
+) {
+    val shape = RoundedCornerShape(14.dp)
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(shape)
+            .background(tint.copy(alpha = 0.1f))
+            .border(1.dp, tint.copy(alpha = 0.25f), shape)
+            .clickable(onClick = onClick)
+            .padding(horizontal = 14.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Box(
+            modifier = Modifier
+                .size(42.dp)
+                .clip(CircleShape)
+                .background(tint.copy(alpha = 0.18f)),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(icon, contentDescription = null, tint = tint, modifier = Modifier.size(22.dp))
+        }
+        Spacer(modifier = Modifier.width(12.dp))
+        Column(modifier = Modifier.weight(1f)) {
+            Text(title, color = appTitleText(), fontSize = 15.sp, fontWeight = FontWeight.Bold)
+            Text(subtitle, color = appCaptionText(), fontSize = 12.sp)
+        }
+        Icon(
+            Icons.Default.ChevronRight,
+            contentDescription = null,
+            tint = appMutedText(),
+            modifier = Modifier.size(20.dp)
+        )
+    }
+}
+
+private enum class OfflineRequestType {
+    Chat,
+    Call,
+    VideoCall
+}
+
+private fun offlineNotifyMessage(username: String, requestType: OfflineRequestType): String {
+    val action = when (requestType) {
+        OfflineRequestType.Chat -> "Please Chat with me"
+        OfflineRequestType.Call -> "Please Call me"
+        OfflineRequestType.VideoCall -> "Please Video Call me"
+    }
+    return "Hi $username, I want to talk to you. $action 🙂"
+}
+
+@Composable
+private fun BrowseOfflineNotifyDialog(
+    model: AppModel,
+    onDismiss: () -> Unit,
+    onSendMessage: (String, OfflineRequestType) -> Unit
+) {
+    val username = model.publicUsername()
+    var requestType by remember(model.id) { mutableStateOf(OfflineRequestType.Call) }
+    var message by remember(model.id) {
+        mutableStateOf(offlineNotifyMessage(username, OfflineRequestType.Call))
+    }
+    val accentYellow = Color(0xFFFFC107)
+    val accentTeal = appSuccessColor()
+    val cardShape = RoundedCornerShape(20.dp)
+    val messageShape = RoundedCornerShape(14.dp)
+    val title = when (model.status) {
+        "Busy" -> "Listener is Busy"
+        else -> "Listener is Offline"
+    }
+
+    LaunchedEffect(requestType) {
+        message = offlineNotifyMessage(username, requestType)
+    }
+
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(usePlatformDefaultWidth = false)
+    ) {
+        Surface(
+            modifier = Modifier
+                .fillMaxWidth(0.9f)
+                .appSoftShadow(cardShape, elevation = 12.dp),
+            shape = cardShape,
+            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.98f),
+            tonalElevation = 8.dp
+        ) {
+            Column(
+                modifier = Modifier.padding(horizontal = 20.dp, vertical = 22.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Text(
+                    text = title,
+                    color = accentYellow,
+                    fontSize = 20.sp,
+                    fontWeight = FontWeight.Bold,
+                    textAlign = TextAlign.Center
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = "Send message instead?",
+                    color = appSecondaryText(),
+                    fontSize = 14.sp,
+                    textAlign = TextAlign.Center
+                )
+                Spacer(modifier = Modifier.height(18.dp))
+
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(min = 110.dp)
+                        .clip(messageShape)
+                        .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.65f))
+                        .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.2f), messageShape)
+                        .padding(horizontal = 14.dp, vertical = 12.dp)
+                ) {
+                    BasicTextField(
+                        value = message,
+                        onValueChange = { message = it },
+                        modifier = Modifier.fillMaxWidth(),
+                        textStyle = MaterialTheme.typography.bodyMedium.copy(
+                            color = appTitleText(),
+                            fontSize = 14.sp,
+                            lineHeight = 20.sp
+                        )
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(18.dp))
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceEvenly,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    OfflineRequestTypeOption(
+                        label = "Chat",
+                        selected = requestType == OfflineRequestType.Chat,
+                        accentColor = accentTeal,
+                        onClick = { requestType = OfflineRequestType.Chat }
+                    )
+                    OfflineRequestTypeOption(
+                        label = "Call",
+                        selected = requestType == OfflineRequestType.Call,
+                        accentColor = accentTeal,
+                        onClick = { requestType = OfflineRequestType.Call }
+                    )
+                    OfflineRequestTypeOption(
+                        label = "Video Call",
+                        selected = requestType == OfflineRequestType.VideoCall,
+                        accentColor = accentTeal,
+                        onClick = { requestType = OfflineRequestType.VideoCall }
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(22.dp))
+
+                OutlinedButton(
+                    onClick = {
+                        if (message.isNotBlank()) {
+                            onSendMessage(message.trim(), requestType)
+                        }
+                    },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(48.dp),
+                    shape = RoundedCornerShape(12.dp),
+                    border = androidx.compose.foundation.BorderStroke(1.5.dp, accentYellow),
+                    colors = ButtonDefaults.outlinedButtonColors(
+                        containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.5f),
+                        contentColor = accentYellow
+                    )
+                ) {
+                    Text(
+                        text = "Send Message",
+                        fontSize = 15.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun OfflineRequestTypeOption(
+    label: String,
+    selected: Boolean,
+    accentColor: Color,
+    onClick: () -> Unit
+) {
+    Column(
+        modifier = Modifier.clickable(onClick = onClick),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Box(
+            modifier = Modifier
+                .size(22.dp)
+                .clip(CircleShape)
+                .border(2.dp, accentColor, CircleShape),
+            contentAlignment = Alignment.Center
+        ) {
+            if (selected) {
+                Box(
+                    modifier = Modifier
+                        .size(12.dp)
+                        .clip(CircleShape)
+                        .background(accentColor)
+                )
+            }
+        }
+        Spacer(modifier = Modifier.height(6.dp))
+        Text(
+            text = label,
+            color = if (selected) appTitleText() else appCaptionText(),
+            fontSize = 12.sp,
+            fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium,
+            textAlign = TextAlign.Center
+        )
+    }
+}
+
+@Composable
+private fun BrowseRatePill(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    label: String,
+    tint: Color
+) {
+    Row(
+        modifier = Modifier
+            .clip(RoundedCornerShape(8.dp))
+            .background(tint.copy(alpha = 0.12f))
+            .padding(horizontal = 6.dp, vertical = 3.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Icon(icon, contentDescription = null, tint = tint, modifier = Modifier.size(11.dp))
+        Spacer(modifier = Modifier.width(3.dp))
+        Text(label, color = tint, fontSize = 10.sp, fontWeight = FontWeight.SemiBold)
+    }
 }
 
 @Composable
@@ -214,7 +781,9 @@ fun TopBarSection(
     val textColor = appTitleText()
     val isLight = !isAppDarkTheme()
     val compact = isCompactWidth()
-    val searchShape = RoundedCornerShape(16.dp)
+    val barShape = RoundedCornerShape(12.dp)
+    val barItemHeight = if (compact) 42.dp else 44.dp
+    val fieldFontSize = if (compact) 13.sp else 14.sp
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -222,49 +791,95 @@ fun TopBarSection(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween
     ) {
-        // Search bar
-        OutlinedTextField(
-            value = searchQuery,
-            onValueChange = onSearchQueryChanged,
+        val searchContainerColor = if (isLight) {
+            MaterialTheme.colorScheme.surfaceContainerHighest
+        } else {
+            MaterialTheme.colorScheme.surface
+        }
+        Box(
             modifier = Modifier
                 .weight(1f)
-                .height(if (compact) 46.dp else 50.dp)
-                .appSoftShadow(searchShape, elevation = if (isLight) 6.dp else 2.dp),
-            placeholder = { Text("Search models...", color = appCaptionText()) },
-            leadingIcon = { Icon(Icons.Default.Search, contentDescription = "Search", tint = appMutedText()) },
-            shape = searchShape,
-            colors = appOutlinedFieldColors(),
-            singleLine = true
-        )
-        
-        Spacer(modifier = Modifier.width(if (compact) 8.dp else 16.dp))
-        
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(if (compact) 8.dp else 14.dp)) {
-            // Coin status
+                .height(barItemHeight)
+                .appSoftShadow(barShape, elevation = if (isLight) 6.dp else 2.dp)
+                .clip(barShape)
+                .background(searchContainerColor)
+                .border(1.dp, appBorderColor(AppBorderWeight.Default), barShape)
+                .padding(horizontal = if (compact) 10.dp else 12.dp),
+            contentAlignment = Alignment.CenterStart
+        ) {
             Row(
-                modifier = Modifier
-                    .clip(RoundedCornerShape(12.dp))
-                    .appSoftShadow(RoundedCornerShape(12.dp), elevation = if (isLight) 4.dp else 2.dp)
-                    .background(accentHorizontalGradient())
-                    .padding(horizontal = if (compact) 8.dp else 10.dp, vertical = if (compact) 5.dp else 6.dp),
+                modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Icon(Icons.Default.MonetizationOn, contentDescription = "Tokens", tint = Color.White, modifier = Modifier.size(if (compact) 14.dp else 16.dp))
+                Icon(
+                    Icons.Default.Search,
+                    contentDescription = "Search",
+                    tint = appMutedText(),
+                    modifier = Modifier.size(if (compact) 18.dp else 20.dp)
+                )
+                Spacer(modifier = Modifier.width(if (compact) 8.dp else 10.dp))
+                Box(modifier = Modifier.weight(1f)) {
+                    if (searchQuery.isEmpty()) {
+                        Text(
+                            text = "Search models...",
+                            color = appCaptionText(),
+                            fontSize = fieldFontSize,
+                            maxLines = 1
+                        )
+                    }
+                    BasicTextField(
+                        value = searchQuery,
+                        onValueChange = onSearchQueryChanged,
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true,
+                        textStyle = MaterialTheme.typography.bodyMedium.copy(
+                            color = appTitleText(),
+                            fontSize = fieldFontSize,
+                            lineHeight = fieldFontSize
+                        )
+                    )
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.width(if (compact) 8.dp else 16.dp))
+
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(if (compact) 8.dp else 14.dp)
+        ) {
+            Row(
+                modifier = Modifier
+                    .height(barItemHeight)
+                    .clip(barShape)
+                    .appSoftShadow(barShape, elevation = if (isLight) 4.dp else 2.dp)
+                    .background(accentHorizontalGradient())
+                    .padding(horizontal = if (compact) 10.dp else 12.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(
+                    Icons.Default.CurrencyRupee,
+                    contentDescription = "Rupees",
+                    tint = Color.White,
+                    modifier = Modifier.size(if (compact) 16.dp else 18.dp)
+                )
                 Spacer(modifier = Modifier.width(if (compact) 4.dp else 6.dp))
                 Text(
                     totalTokenBalance,
                     color = Color.White,
-                    fontSize = if (compact) 11.sp else 13.sp,
+                    fontSize = fieldFontSize,
                     fontWeight = FontWeight.Bold,
                     maxLines = 1
                 )
             }
 
-            // Notification
-            Box(
-                modifier = Modifier.clickable(onClick = onNotificationsClick)
-            ) {
-                Icon(Icons.Outlined.Notifications, contentDescription = "Notifications", tint = textColor, modifier = Modifier.size(if (compact) 22.dp else 26.dp))
+            Box(modifier = Modifier.clickable(onClick = onNotificationsClick)) {
+                Icon(
+                    Icons.Outlined.Notifications,
+                    contentDescription = "Notifications",
+                    tint = textColor,
+                    modifier = Modifier.size(if (compact) 22.dp else 26.dp)
+                )
                 if (unreadNotificationCount > 0) {
                     Box(
                         modifier = Modifier
@@ -280,421 +895,6 @@ fun TopBarSection(
 }
 
 @Composable
-fun CategoriesSection(selectedCategory: String, onCategorySelected: (String) -> Unit) {
-    val categories = listOf("All", "Top Rated", "Available", "Popular", "New", "Gaming")
-    val isLight = !isAppDarkTheme()
-    val chipShape = RoundedCornerShape(14.dp)
-    
-    LazyRow(
-        contentPadding = PaddingValues(horizontal = 18.dp),
-        horizontalArrangement = Arrangement.spacedBy(12.dp)
-    ) {
-        items(categories) { category ->
-            val isSelected = category == selectedCategory
-            Box(
-                modifier = Modifier
-                    .then(
-                        if (isSelected && isLight) {
-                            Modifier.appSoftShadow(chipShape, elevation = 4.dp)
-                        } else if (!isSelected && isLight) {
-                            Modifier.appSoftShadow(chipShape, elevation = 2.dp)
-                        } else Modifier
-                    )
-                    .clip(chipShape)
-                    .then(
-                        if (isSelected) {
-                            Modifier.background(accentHorizontalGradient())
-                        } else {
-                            Modifier
-                                .background(MaterialTheme.colorScheme.surface)
-                                .border(1.dp, appBorderColor(AppBorderWeight.Default), chipShape)
-                        }
-                    )
-                    .clickable { onCategorySelected(category) }
-            ) {
-                Text(
-                    text = category,
-                    modifier = Modifier.padding(horizontal = 18.dp, vertical = 10.dp),
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = when {
-                        isSelected -> Color.White
-                        else -> appMutedText()
-                    }
-                )
-            }
-        }
-    }
-}
-
-@Composable
-fun HomePromoBannerCarousel(
-    onViewPackages: (String) -> Unit,
-    onShowTutorial: () -> Unit
-) {
-    val banners = remember {
-        listOf(
-            HomePromoBanner(
-                id = "tutorial",
-                badge = "GET STARTED",
-                title = "How Pairr Works",
-                subtitle = "Learn to browse models, chat, and start audio or video calls in minutes.",
-                cta = "Watch Tutorial",
-                icon = Icons.Default.School,
-                gradient = DarkPromoGradients.tutorial,
-                action = HomePromoAction.Tutorial
-            ),
-            HomePromoBanner(
-                id = "welcome_tokens",
-                badge = "WELCOME OFFER",
-                title = "250 Bonus Tokens",
-                subtitle = "Get extra tokens free on your first token purchase. Limited time only!",
-                cta = "Claim Offer",
-                icon = Icons.Default.LocalOffer,
-                gradient = DarkPromoGradients.welcome,
-                action = HomePromoAction.TokenPackages("All")
-            ),
-            HomePromoBanner(
-                id = "audio_scheme",
-                badge = "AUDIO PACKS",
-                title = "Save 20% on Audio",
-                subtitle = "Buy audio token packs and enjoy longer conversations at lower rates.",
-                cta = "Buy Audio Tokens",
-                icon = Icons.Default.MonetizationOn,
-                gradient = DarkPromoGradients.audio,
-                action = HomePromoAction.TokenPackages("Audio")
-            ),
-            HomePromoBanner(
-                id = "video_scheme",
-                badge = "VIDEO PACKS",
-                title = "Premium Video Deals",
-                subtitle = "HD video call packs with up to 35% savings on Supreme VIP plans.",
-                cta = "Buy Video Tokens",
-                icon = Icons.Default.PlayCircle,
-                gradient = DarkPromoGradients.video,
-                action = HomePromoAction.TokenPackages("Video")
-            ),
-            HomePromoBanner(
-                id = "token_guide",
-                badge = "TOKEN GUIDE",
-                title = "Understand Tokens",
-                subtitle = "See how audio and video tokens work, pricing, and the best packs for you.",
-                cta = "Read Guide",
-                icon = Icons.Default.School,
-                gradient = DarkPromoGradients.guide,
-                action = HomePromoAction.Tutorial
-            )
-        )
-    }
-
-    val pagerState = rememberPagerState(pageCount = { banners.size })
-
-    LaunchedEffect(pagerState) {
-        while (true) {
-            delay(4500)
-            val nextPage = (pagerState.currentPage + 1) % banners.size
-            pagerState.animateScrollToPage(nextPage)
-        }
-    }
-
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(bottom = 8.dp)
-    ) {
-        HorizontalPager(
-            state = pagerState,
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(168.dp),
-            contentPadding = PaddingValues(horizontal = 18.dp),
-            pageSpacing = 12.dp
-        ) { page ->
-            val banner = banners[page]
-            HomePromoBannerCard(
-                banner = banner,
-                onClick = {
-                    when (banner.action) {
-                        HomePromoAction.Tutorial -> onShowTutorial()
-                        is HomePromoAction.TokenPackages -> onViewPackages(banner.action.filter)
-                    }
-                }
-            )
-        }
-
-        Spacer(modifier = Modifier.height(10.dp))
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.Center,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            banners.indices.forEach { index ->
-                val isSelected = pagerState.currentPage == index
-                Box(
-                    modifier = Modifier
-                        .padding(horizontal = 4.dp)
-                        .height(6.dp)
-                        .width(if (isSelected) 22.dp else 6.dp)
-                        .clip(RoundedCornerShape(50))
-                        .background(
-                            if (isSelected) PinkPrimary
-                            else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.2f)
-                        )
-                )
-            }
-        }
-    }
-}
-
-private data class HomePromoBanner(
-    val id: String,
-    val badge: String,
-    val title: String,
-    val subtitle: String,
-    val cta: String,
-    val icon: ImageVector,
-    val gradient: List<Color>,
-    val action: HomePromoAction
-)
-
-private sealed class HomePromoAction {
-    data object Tutorial : HomePromoAction()
-    data class TokenPackages(val filter: String) : HomePromoAction()
-}
-
-@Composable
-private fun HomePromoBannerCard(
-    banner: HomePromoBanner,
-    onClick: () -> Unit
-) {
-    val brush = Brush.linearGradient(banner.gradient)
-
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(168.dp)
-            .clip(RoundedCornerShape(24.dp))
-            .background(brush)
-            .clickable { onClick() }
-            .padding(18.dp)
-    ) {
-        Icon(
-            imageVector = banner.icon,
-            contentDescription = null,
-            tint = Color.White.copy(alpha = 0.18f),
-            modifier = Modifier
-                .size(88.dp)
-                .align(Alignment.CenterEnd)
-                .offset(x = 12.dp, y = 8.dp)
-        )
-
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(end = 72.dp),
-            verticalArrangement = Arrangement.SpaceBetween
-        ) {
-            Column {
-                Box(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(8.dp))
-                        .background(Color.White.copy(alpha = 0.22f))
-                        .padding(horizontal = 10.dp, vertical = 4.dp)
-                ) {
-                    Text(
-                        banner.badge,
-                        color = Color.White,
-                        fontSize = 10.sp,
-                        fontWeight = FontWeight.Black,
-                        letterSpacing = 0.8.sp
-                    )
-                }
-                Spacer(modifier = Modifier.height(10.dp))
-                Text(
-                    banner.title,
-                    color = Color.White,
-                    fontSize = 20.sp,
-                    fontWeight = FontWeight.Black,
-                    lineHeight = 24.sp,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis
-                )
-                Spacer(modifier = Modifier.height(4.dp))
-                Text(
-                    banner.subtitle,
-                    color = Color.White.copy(alpha = 0.88f),
-                    fontSize = 12.sp,
-                    lineHeight = 16.sp,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis
-                )
-            }
-
-            Box(
-                modifier = Modifier
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(Color.White)
-                    .padding(horizontal = 14.dp, vertical = 8.dp)
-            ) {
-                Text(
-                    banner.cta,
-                    color = PinkPrimary,
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.Bold
-                )
-            }
-        }
-    }
-}
-
-@Composable
-fun HomeTutorialDialog(onDismiss: () -> Unit) {
-    val textColor = MaterialTheme.colorScheme.onSurface
-    val secondaryText = MaterialTheme.colorScheme.onSurfaceVariant
-    val cardBg = MaterialTheme.colorScheme.surface
-
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        shape = RoundedCornerShape(20.dp),
-        containerColor = cardBg,
-        title = {
-            Text("Pairr Quick Guide", color = textColor, fontWeight = FontWeight.Bold, fontSize = 18.sp)
-        },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                TutorialStep(number = "1", title = "Browse Models", body = "Explore live and recommended models from the home feed or View All.")
-                TutorialStep(number = "2", title = "Buy Tokens", body = "Purchase audio or video token packs from the Token Store to start calls.")
-                TutorialStep(number = "3", title = "Chat & Connect", body = "Message a model first or jump straight into an audio/video call.")
-                TutorialStep(number = "4", title = "Manage Wallet", body = "Track your balance, transactions, and bonus offers from your profile.")
-            }
-        },
-        confirmButton = {
-            TextButton(onClick = onDismiss) {
-                Text("Got it", color = PinkPrimary, fontWeight = FontWeight.Bold)
-            }
-        },
-        tonalElevation = 6.dp
-    )
-}
-
-@Composable
-private fun TutorialStep(number: String, title: String, body: String) {
-    val textColor = MaterialTheme.colorScheme.onSurface
-    val secondaryText = MaterialTheme.colorScheme.onSurfaceVariant
-
-    Row(verticalAlignment = Alignment.Top) {
-        Box(
-            modifier = Modifier
-                .size(28.dp)
-                .clip(CircleShape)
-                .background(PinkPrimary.copy(alpha = 0.15f)),
-            contentAlignment = Alignment.Center
-        ) {
-            Text(number, color = PinkPrimary, fontWeight = FontWeight.Bold, fontSize = 13.sp)
-        }
-        Spacer(modifier = Modifier.width(12.dp))
-        Column {
-            Text(title, color = textColor, fontWeight = FontWeight.Bold, fontSize = 14.sp)
-            Text(body, color = secondaryText, fontSize = 13.sp, lineHeight = 18.sp)
-        }
-    }
-}
-
-@Composable
-fun HeroBanner() {
-    val pinkGradient = Brush.horizontalGradient(listOf(PinkPrimary, OrangeSecondary))
-    
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 18.dp)
-            .height(200.dp)
-            .clip(RoundedCornerShape(30.dp))
-    ) {
-        AsyncImage(
-            model = "https://images.unsplash.com/photo-1529626455594-4ff0802cfb7e?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80",
-            contentDescription = "Hero Image",
-            modifier = Modifier.fillMaxSize(),
-            contentScale = ContentScale.Crop
-        )
-        
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(Brush.verticalGradient(listOf(Color.Transparent, Color.Black.copy(alpha = 0.85f))))
-        )
-        
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(24.dp),
-            verticalArrangement = Arrangement.Bottom
-        ) {
-            Row(
-                modifier = Modifier
-                    .clip(RoundedCornerShape(10.dp))
-                    .background(Color.Black.copy(alpha = 0.4f))
-                    .padding(horizontal = 10.dp, vertical = 4.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Box(modifier = Modifier.size(6.dp).clip(CircleShape).background(Color(0xFF00E676)))
-                Spacer(modifier = Modifier.width(6.dp))
-                Text("HOT NOW", color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Black)
-            }
-            Spacer(modifier = Modifier.height(8.dp))
-            Text("Star of the Week: Alessia", color = Color.White, fontSize = 22.sp, fontWeight = FontWeight.Black)
-            Text("Join her live session for exclusive rewards", color = Color.White.copy(alpha = 0.75f), fontSize = 13.sp)
-        }
-        
-        // Join Button floating inside
-        Box(
-            modifier = Modifier
-                .align(Alignment.BottomEnd)
-                .padding(20.dp)
-        ) {
-            Button(
-                onClick = { /* TODO: Implement Watch Live navigation */ },
-                colors = ButtonDefaults.buttonColors(containerColor = Color.Transparent),
-                contentPadding = PaddingValues(0.dp),
-                modifier = Modifier.height(44.dp).width(110.dp)
-            ) {
-                Box(
-                    modifier = Modifier.fillMaxSize().background(pinkGradient, RoundedCornerShape(12.dp)),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text("Watch Live", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 14.sp)
-                }
-            }
-        }
-    }
-}
-
-@Composable
-fun SectionHeader(title: String, subtitle: String? = null, onViewAll: () -> Unit) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 18.dp, vertical = 16.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.Bottom
-    ) {
-        Column {
-            Text(title, color = appTitleText(), fontSize = 20.sp, fontWeight = FontWeight.ExtraBold)
-            if (subtitle != null) {
-                Text(subtitle, color = appCaptionText(), fontSize = 12.sp, fontWeight = FontWeight.Medium)
-            }
-        }
-        Text(
-            text = "View All", 
-            color = PinkPrimary, 
-            fontSize = 14.sp, 
-            fontWeight = FontWeight.Bold,
-            modifier = Modifier.clickable { onViewAll() }
-        )
-    }
-}
-
-@Composable
 fun AvailabilityBadge(status: String, modifier: Modifier = Modifier) {
     val bgColor = when (status) {
         "Online" -> appSuccessColor()
@@ -703,9 +903,9 @@ fun AvailabilityBadge(status: String, modifier: Modifier = Modifier) {
     }
     val textColor = if (status == "Offline") MaterialTheme.colorScheme.onSurfaceVariant else Color.White
     val label = when (status) {
-        "Online" -> "● Online"
-        "Busy" -> "■ Busy"
-        else -> "○ Offline"
+        "Online" -> "Online"
+        "Busy" -> "Busy"
+        else -> "Offline"
     }
     Row(
         modifier = modifier
@@ -720,324 +920,5 @@ fun AvailabilityBadge(status: String, modifier: Modifier = Modifier) {
             fontSize = 9.sp,
             fontWeight = FontWeight.Bold
         )
-    }
-}
-
-@Composable
-fun LiveNowSection(models: List<com.example.data.AppModel>, onModelClick: (String) -> Unit) {
-    LazyRow(
-        contentPadding = PaddingValues(horizontal = 18.dp),
-        horizontalArrangement = Arrangement.spacedBy(18.dp)
-    ) {
-        items(models) { model ->
-            ModelStoryCircle(
-                model = model,
-                onClick = { onModelClick(model.id) },
-                showLiveBadge = true
-            )
-        }
-    }
-}
-
-@Composable
-fun PeopleYouMayLikeSection(
-    models: List<com.example.data.AppModel>,
-    favorites: Set<String>,
-    onFavoriteToggle: (String) -> Unit,
-    onModelClick: (String) -> Unit
-) {
-    val cardShape = RoundedCornerShape(24.dp)
-    
-    LazyRow(
-        contentPadding = PaddingValues(horizontal = 18.dp),
-        horizontalArrangement = Arrangement.spacedBy(16.dp)
-    ) {
-        items(models.shuffled()) { model ->
-            Column(
-                modifier = Modifier
-                    .width(180.dp)
-                    .appSurfaceCard(shape = cardShape, borderWeight = AppBorderWeight.Default)
-                    .clickable { onModelClick(model.id) }
-            ) {
-                Box {
-                    ModelCardMedia(
-                        model = model,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(180.dp)
-                            .clip(RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp)),
-                        useProfilePhotoOnly = true
-                    )
-                    
-                    val isFavorite = favorites.contains(model.id)
-                    IconButton(
-                        onClick = { onFavoriteToggle(model.id) },
-                        modifier = Modifier
-                            .align(Alignment.TopEnd)
-                            .padding(8.dp)
-                            .size(32.dp)
-                            .background(Color.Black.copy(alpha = 0.3f), CircleShape)
-                    ) {
-                        Icon(
-                            imageVector = if (isFavorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
-                            contentDescription = "Favorite",
-                            tint = if (isFavorite) PinkPrimary else Color.White,
-                            modifier = Modifier.size(18.dp)
-                        )
-                    }
-                    
-                    // Rating overlay
-                    Box(
-                        modifier = Modifier
-                            .align(Alignment.BottomStart)
-                            .padding(10.dp)
-                            .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.6f), RoundedCornerShape(8.dp))
-                            .padding(horizontal = 6.dp, vertical = 2.dp)
-                    ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(Icons.Default.Star, contentDescription = null, tint = MaterialTheme.colorScheme.tertiary, modifier = Modifier.size(10.dp))
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text(String.format("%.1f", model.rating), color = MaterialTheme.colorScheme.onSurface, fontSize = 10.sp, fontWeight = FontWeight.Bold)
-                        }
-                    }
-                }
-                
-                Column(modifier = Modifier.padding(14.dp)) {
-                    Text(model.publicUsername(), color = appTitleText(), fontSize = 16.sp, fontWeight = FontWeight.Bold, maxLines = 1)
-                    Text(
-                        "${model.status} • ${model.categories.firstOrNull()}",
-                        color = appCaptionText(),
-                        fontSize = 12.sp,
-                        maxLines = 1
-                    )
-                    
-                    Spacer(modifier = Modifier.height(12.dp))
-                    
-                    Button(
-                        onClick = { onModelClick(model.id) },
-                        modifier = Modifier.fillMaxWidth().height(36.dp),
-                        shape = RoundedCornerShape(10.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = PinkPrimary),
-                        contentPadding = PaddingValues(0.dp)
-                    ) {
-                        Text(
-                            "View Profile",
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = Color.White
-                        )
-                    }
-                }
-            }
-        }
-    }
-}
-
-@Composable
-fun PopularRoomsSection() {
-    LazyRow(
-        contentPadding = PaddingValues(horizontal = 16.dp),
-        horizontalArrangement = Arrangement.spacedBy(12.dp)
-    ) {
-        items(4) { index ->
-            Box(
-                modifier = Modifier
-                    .width(150.dp)
-                    .height(200.dp)
-                    .clip(RoundedCornerShape(16.dp))
-            ) {
-                AsyncImage(
-                    model = "https://images.unsplash.com/photo-1542382156909-9ae37b3f56fd?ixlib=rb-4.0.3&auto=format&fit=crop&w=300&q=80", // using a generic room image
-                    contentDescription = "Room",
-                    modifier = Modifier.fillMaxSize(),
-                    contentScale = ContentScale.Crop
-                )
-                
-                 // Overlay gradient with slightly purple tint
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .background(Color(0x884A00E0)) // Purple tint
-                )
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .background(Brush.verticalGradient(
-                            colors = listOf(Color(0x000B0A10), Color(0xEE0B0A10))
-                        ))
-                )
-                
-                Column(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(12.dp)
-                ) {
-                    val titles = listOf("Chill Vibes 🎧", "Singing Live 🎵", "Game On 🎮", "Chat Room 💬")
-                    Text(titles[index], color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Bold)
-                    
-                    Spacer(modifier = Modifier.height(4.dp))
-                    
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Default.Person, contentDescription = "Members", tint = Color.White.copy(alpha = 0.8f), modifier = Modifier.size(12.dp))
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text("${1.5 + index * 0.3}K", color = Color.White.copy(alpha = 0.8f), fontSize = 11.sp, fontWeight = FontWeight.Medium)
-                    }
-                    
-                    Spacer(modifier = Modifier.weight(1f))
-                    
-                    Row {
-                        listOf("1", "2", "3").forEachIndexed { avatarIndex, _ ->
-                            AsyncImage(
-                                model = "https://i.pravatar.cc/100?img=${avatarIndex + index * 3 + 40}",
-                                contentDescription = "Avatar",
-                                modifier = Modifier
-                                    .size(28.dp)
-                                    .offset(x = if (avatarIndex > 0) -(avatarIndex * 10).dp else 0.dp)
-                                    .clip(CircleShape)
-                                    .border(1.5.dp, appBorderColor(), CircleShape),
-                                contentScale = ContentScale.Crop
-                            )
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
-
-@Composable
-fun RandomCallHighlightCard(
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    val shape = RoundedCornerShape(20.dp)
-    val gradient = Brush.horizontalGradient(listOf(PinkPrimary, OrangeSecondary))
-
-    Box(
-        modifier = modifier
-            .fillMaxWidth()
-            .clip(shape)
-            .background(gradient)
-            .clickable(onClick = onClick)
-            .padding(2.dp)
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(18.dp))
-                .background(MaterialTheme.colorScheme.surface)
-                .padding(horizontal = 16.dp, vertical = 14.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Box(
-                modifier = Modifier
-                    .size(52.dp)
-                    .clip(CircleShape)
-                    .background(gradient),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Shuffle,
-                    contentDescription = null,
-                    tint = Color.White,
-                    modifier = Modifier.size(26.dp)
-                )
-            }
-
-            Spacer(modifier = Modifier.width(14.dp))
-
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = "Random Call",
-                    color = appTitleText(),
-                    fontSize = 17.sp,
-                    fontWeight = FontWeight.Bold
-                )
-                Spacer(modifier = Modifier.height(2.dp))
-                Text(
-                    text = "Instant video chat with another user — not models",
-                    color = appSecondaryText(),
-                    fontSize = 12.sp,
-                    lineHeight = 16.sp
-                )
-            }
-
-            Icon(
-                imageVector = Icons.Default.Videocam,
-                contentDescription = null,
-                tint = PinkPrimary,
-                modifier = Modifier.size(28.dp)
-            )
-        }
-    }
-}
-
-@Composable
-fun RandomCallMatchingOverlay(
-    viewModel: MainViewModel,
-    onMatched: (String) -> Unit,
-    onDismiss: () -> Unit
-) {
-    var statusText by remember { mutableStateOf("Finding someone nearby...") }
-
-    LaunchedEffect(Unit) {
-        delay(1200)
-        statusText = "Matching you with a user..."
-        delay(900)
-        val match = viewModel.findRandomPeerUser()
-        if (match != null) {
-            statusText = "Connected with ${match.name}!"
-            delay(400)
-            onMatched(match.userId)
-        } else {
-            onDismiss()
-        }
-    }
-
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(Color.Black.copy(alpha = 0.88f)),
-        contentAlignment = Alignment.Center
-    ) {
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            modifier = Modifier.padding(32.dp)
-        ) {
-            Box(
-                modifier = Modifier
-                    .size(88.dp)
-                    .clip(CircleShape)
-                    .background(PinkPrimary.copy(alpha = 0.15f)),
-                contentAlignment = Alignment.Center
-            ) {
-                CircularProgressIndicator(
-                    color = PinkPrimary,
-                    strokeWidth = 3.dp,
-                    modifier = Modifier.size(56.dp)
-                )
-            }
-            Spacer(modifier = Modifier.height(24.dp))
-            Text(
-                text = "Random Video Call",
-                color = Color.White,
-                fontSize = 22.sp,
-                fontWeight = FontWeight.Bold
-            )
-            Spacer(modifier = Modifier.height(8.dp))
-            Text(
-                text = statusText,
-                color = Color.White.copy(alpha = 0.7f),
-                fontSize = 14.sp,
-                textAlign = TextAlign.Center
-            )
-            Spacer(modifier = Modifier.height(6.dp))
-            Text(
-                text = "User-to-user only · Models are not included",
-                color = PinkPrimary.copy(alpha = 0.85f),
-                fontSize = 12.sp,
-                textAlign = TextAlign.Center
-            )
-        }
     }
 }

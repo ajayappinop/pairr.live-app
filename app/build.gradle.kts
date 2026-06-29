@@ -1,3 +1,5 @@
+import java.util.Properties
+
 plugins {
   alias(libs.plugins.android.application)
   alias(libs.plugins.kotlin.compose)
@@ -5,6 +7,12 @@ plugins {
   alias(libs.plugins.roborazzi)
   alias(libs.plugins.secrets)
 }
+
+val keystoreProperties =
+  Properties().apply {
+    val file = rootProject.file("keystore.properties")
+    if (file.exists()) file.inputStream().use { load(it) }
+  }
 
 android {
   namespace = "com.example"
@@ -24,9 +32,11 @@ android {
     create("release") {
       val keystorePath = System.getenv("KEYSTORE_PATH") ?: "${rootDir}/my-upload-key.jks"
       storeFile = file(keystorePath)
-      storePassword = System.getenv("STORE_PASSWORD")
+      storePassword =
+        System.getenv("STORE_PASSWORD") ?: keystoreProperties.getProperty("storePassword")
       keyAlias = "upload"
-      keyPassword = System.getenv("KEY_PASSWORD")
+      keyPassword =
+        System.getenv("KEY_PASSWORD") ?: keystoreProperties.getProperty("keyPassword")
     }
     create("debugConfig") {
       storeFile = file("${rootDir}/debug.keystore")

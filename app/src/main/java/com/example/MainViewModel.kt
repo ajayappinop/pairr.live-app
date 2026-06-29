@@ -11,7 +11,8 @@ import com.example.data.ChatMessage
 import com.example.data.ChatThread
 import com.example.data.ChatRepository
 import com.example.data.UserProfile
-import com.example.data.displayImageUrls
+import com.example.data.displayProfilePhotoUrl
+import com.example.data.publicUsername
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -35,27 +36,6 @@ data class BlockedUser(
     val name: String,
     val avatarUrl: String,
     val blockedAt: String
-)
-
-data class RandomPeerMatch(
-    val userId: String,
-    val name: String,
-    val avatarUrl: String
-)
-
-data class CallBooking(
-    val id: String,
-    val modelId: String,
-    val modelName: String,
-    val modelAvatarUrl: String,
-    val isVideo: Boolean,
-    val date: String,
-    val timeSlot: String,
-    val cost: Int,
-    val userId: String = "",
-    val userName: String = "",
-    val userAvatarUrl: String = "",
-    val status: String = "Scheduled" // "Scheduled", "Accepted", "Completed", "Cancelled"
 )
 
 data class ModelReview(
@@ -176,12 +156,12 @@ class MainViewModel : ViewModel() {
 
     private val _modelEarnings = MutableStateFlow<List<ModelCallEarning>>(
         listOf(
-            ModelCallEarning("e1", "1", "Rahul S.", true, "15:00", "10 Jun 2026, 10:15 AM", 300),
-            ModelCallEarning("e2", "1", "Amit P.", false, "12:30", "09 Jun 2026, 08:35 PM", 250),
-            ModelCallEarning("e3", "1", "Vikram D.", true, "08:45", "08 Jun 2026, 06:20 PM", 180),
-            ModelCallEarning("e4", "1", "Karan W.", false, "20:00", "07 Jun 2026, 11:00 AM", 400),
-            ModelCallEarning("e5", "3", "Sagar K.", true, "25:00", "08 Jun 2026, 09:10 PM", 360),
-            ModelCallEarning("e6", "3", "Neha R.", false, "10:00", "06 Jun 2026, 04:45 PM", 200)
+            ModelCallEarning("e1", "1", "rahul_sharma", true, "15:00", "10 Jun 2026, 10:15 AM", 300),
+            ModelCallEarning("e2", "1", "amit_p", false, "12:30", "09 Jun 2026, 08:35 PM", 250),
+            ModelCallEarning("e3", "1", "vikram_singh", true, "08:45", "08 Jun 2026, 06:20 PM", 180),
+            ModelCallEarning("e4", "1", "karan_w", false, "20:00", "07 Jun 2026, 11:00 AM", 400),
+            ModelCallEarning("e5", "3", "sagar_k", true, "25:00", "08 Jun 2026, 09:10 PM", 360),
+            ModelCallEarning("e6", "3", "ananya_k", false, "10:00", "06 Jun 2026, 04:45 PM", 200)
         )
     )
     val modelEarnings: StateFlow<List<ModelCallEarning>> = _modelEarnings.asStateFlow()
@@ -207,12 +187,46 @@ class MainViewModel : ViewModel() {
         setModelProfileFullName(fullName)
     }
 
+    fun canModelChatWithUser(userId: String): Boolean {
+        val thread = getThreadWithUser(userId) ?: return false
+        val messages = _chatMessages.value[thread.id] ?: emptyList()
+        if (messages.isEmpty()) return false
+        val firstMessage = messages.minByOrNull { it.timestampMillis } ?: return false
+        return firstMessage.isFromUser
+    }
+
+    fun getThreadWithUser(userId: String): ChatThread? {
+        val modelId = _linkedModelId.value ?: return null
+        return _chatThreads.value.find { thread ->
+            thread.modelId == modelId && userIdsMatch(thread.userId, userId)
+        }
+    }
+
+    fun updateModelProfileContent(
+        bio: String,
+        languages: Set<String>,
+        categories: Set<String>
+    ) {
+        updateCurrentModel {
+            it.copy(
+                bio = bio.trim(),
+                languages = languages.toList(),
+                categories = categories.toList()
+            )
+        }
+    }
+
+    fun getCurrentUserPhoneDisplay(): String {
+        val userId = _currentUserId.value ?: return ""
+        return userId.removeSuffix("@dummy.phone").trim()
+    }
+
     private val _notifications = MutableStateFlow(
         listOf(
             AppNotification(
                 id = "n1",
                 title = "Welcome Bonus 🎁",
-                message = "You received 250 bonus tokens on your first visit. Claim them from the Token Store!",
+                message = "You received 250 bonus rupees on your first visit. Claim them from the Rupee Store!",
                 time = "Just now"
             ),
             AppNotification(
@@ -230,7 +244,7 @@ class MainViewModel : ViewModel() {
             AppNotification(
                 id = "n4",
                 title = "Video pack offer",
-                message = "Save up to 35% on premium video token packs — limited time only.",
+                message = "Save up to 35% on premium video rupee packs — limited time only.",
                 time = "Yesterday",
                 isRead = true
             )
@@ -243,13 +257,13 @@ class MainViewModel : ViewModel() {
             AppNotification(
                 id = "mn1",
                 title = "New call request 📞",
-                message = "Rahul Sharma requested a video call — 150 tokens/min.",
+                message = "Rahul Sharma requested a video call — 150 rupees/min.",
                 time = "2 min ago"
             ),
             AppNotification(
                 id = "mn2",
                 title = "Earnings credited 💰",
-                message = "You earned 300 tokens from your call with Rahul S.",
+                message = "You earned 300 rupees from your call with Rahul S.",
                 time = "15 min ago"
             ),
             AppNotification(
@@ -325,29 +339,6 @@ class MainViewModel : ViewModel() {
 
     fun getCurrentModelId(): String? = _linkedModelId.value
 
-    /** Picks a random regular user for peer video calls — never a model account. */
-    fun findRandomPeerUser(excludeUserIds: Set<String> = emptySet()): RandomPeerMatch? {
-        val currentUserId = _currentUserId.value
-        val blockedIds = _blockedUsers.value.map { it.id }.toSet()
-        val modelAccountIds = userModelLinks.keys + _userModes.value.filter { it.value }.keys
-
-        val peerPool = demoUserDisplayNames.keys.filter { userId ->
-            userId !in modelAccountIds &&
-                userId !in blockedIds &&
-                userId != currentUserId &&
-                userId !in excludeUserIds
-        }
-        if (peerPool.isEmpty()) return null
-
-        val pickedId = peerPool.random()
-        val profile = getUserProfile(pickedId)
-        return RandomPeerMatch(
-            userId = pickedId,
-            name = profile.name,
-            avatarUrl = profile.avatarUrl
-        )
-    }
-
     fun getReviewsForCurrentModel(): List<ModelReview> {
         val modelId = _linkedModelId.value ?: return emptyList()
         return _reviews.value.filter { it.modelId == modelId }
@@ -417,139 +408,15 @@ class MainViewModel : ViewModel() {
     private val _chatMessages = MutableStateFlow(createInitialChatMessages())
     val chatMessages: StateFlow<Map<String, List<ChatMessage>>> = _chatMessages.asStateFlow()
 
-    private val _bookings = MutableStateFlow<List<CallBooking>>(
-        listOf(
-            CallBooking(
-                id = "b1",
-                modelId = "1",
-                modelName = "alessia_beauty",
-                modelAvatarUrl = "https://api.dicebear.com/7.x/bottts/png?seed=1",
-                isVideo = true,
-                date = "Tomorrow, Jun 12",
-                timeSlot = "04:30 PM - 05:00 PM",
-                cost = 250,
-                userId = "rahul_sharma",
-                userName = "Rahul Sharma",
-                userAvatarUrl = "https://i.pravatar.cc/300?u=rahul_sharma"
-            ),
-            CallBooking(
-                id = "b3",
-                modelId = "1",
-                modelName = "alessia_beauty",
-                modelAvatarUrl = "https://api.dicebear.com/7.x/bottts/png?seed=1",
-                isVideo = false,
-                date = "Sat, Jun 13",
-                timeSlot = "11:30 AM - 12:00 PM",
-                cost = 180,
-                userId = "vikram_singh",
-                userName = "Vikram Singh",
-                userAvatarUrl = "https://i.pravatar.cc/300?u=vikram_singh"
-            ),
-            CallBooking(
-                id = "b4",
-                modelId = "1",
-                modelName = "alessia_beauty",
-                modelAvatarUrl = "https://api.dicebear.com/7.x/bottts/png?seed=1",
-                isVideo = true,
-                date = "Sun, Jun 14",
-                timeSlot = "02:00 PM - 02:30 PM",
-                cost = 300,
-                userId = "ananya_k",
-                userName = "Ananya K.",
-                userAvatarUrl = "https://i.pravatar.cc/300?u=ananya_k"
-            ),
-            CallBooking(
-                id = "b2",
-                modelId = "3",
-                modelName = "riya_patel",
-                modelAvatarUrl = "https://api.dicebear.com/7.x/bottts/png?seed=3",
-                isVideo = false,
-                date = "Jun 14, 2026",
-                timeSlot = "11:00 AM - 11:30 AM",
-                cost = 150,
-                userId = "ajay@appinop.com",
-                userName = "Ajay Kumar",
-                userAvatarUrl = "https://i.pravatar.cc/300?u=ajay@appinop.com"
-            )
-        )
-    )
-    val bookings: StateFlow<List<CallBooking>> = _bookings.asStateFlow()
-
     private val _transactions = MutableStateFlow<List<WalletTransaction>>(
         listOf(
-            WalletTransaction("tx1", "Gold Plan Activation", "+1250 Tokens", "10 Jun 2026, 09:30 AM", true),
-            WalletTransaction("tx2", "Private Video Call - Aisha Khan", "-300 Video Tokens", "10 Jun 2026, 10:15 AM", false),
-            WalletTransaction("tx3", "Private Audio Call - Riya Patel", "-250 Audio Tokens", "09 Jun 2026, 08:35 PM", false),
-            WalletTransaction("tx4", "Welcome Bonus", "+250 Tokens", "08 Jun 2026, 03:00 PM", true)
+            WalletTransaction("tx1", "Gold Plan Activation", "+1250 Rupees", "10 Jun 2026, 09:30 AM", true),
+            WalletTransaction("tx2", "Private Video Call - Aisha Khan", "-300 Video Rupees", "10 Jun 2026, 10:15 AM", false),
+            WalletTransaction("tx3", "Private Audio Call - Riya Patel", "-250 Audio Rupees", "09 Jun 2026, 08:35 PM", false),
+            WalletTransaction("tx4", "Welcome Bonus", "+250 Rupees", "08 Jun 2026, 03:00 PM", true)
         )
     )
     val transactions: StateFlow<List<WalletTransaction>> = _transactions.asStateFlow()
-
-    fun scheduleCall(booking: CallBooking): Boolean {
-        val prepaid = deductTokens(
-            amount = booking.cost,
-            isVideo = booking.isVideo,
-            reason = "Scheduled Call - ${booking.modelName}"
-        )
-        if (!prepaid) return false
-
-        val userId = _currentUserId.value.orEmpty()
-        val enriched = if (userId.isNotBlank() && booking.userId.isBlank()) {
-            val profile = getUserProfile(userId)
-            booking.copy(
-                userId = userId,
-                userName = profile.name,
-                userAvatarUrl = profile.avatarUrl
-            )
-        } else {
-            booking
-        }
-        _bookings.value = listOf(enriched) + _bookings.value
-
-        val callType = if (enriched.isVideo) "video" else "audio"
-        val userLabel = enriched.userName.ifBlank { "A user" }
-        val timeLabel = enriched.timeSlot.substringBefore(" -").trim()
-        pushModelNotification(
-            title = "New scheduled call 📅",
-            message = "$userLabel scheduled a $callType session on ${enriched.date} at $timeLabel (${enriched.cost} tokens paid). Please accept."
-        )
-        return true
-    }
-
-    fun acceptBooking(bookingId: String) {
-        val accepted = _bookings.value.find { it.id == bookingId && it.status == "Scheduled" } ?: return
-        _bookings.update { list ->
-            list.map { booking ->
-                if (booking.id == bookingId && booking.status == "Scheduled") {
-                    booking.copy(status = "Accepted")
-                } else {
-                    booking
-                }
-            }
-        }
-        val callType = if (accepted.isVideo) "video" else "audio"
-        val timeLabel = accepted.timeSlot.substringBefore(" -").trim()
-        pushUserNotification(
-            title = "Session confirmed ✅",
-            message = "${accepted.modelName} accepted your $callType session on ${accepted.date} at $timeLabel."
-        )
-    }
-
-    fun scheduledBookingsForModel(modelId: String): List<CallBooking> =
-        _bookings.value.filter {
-            it.modelId == modelId && (it.status == "Scheduled" || it.status == "Accepted")
-        }
-
-    fun cancelBooking(bookingId: String) {
-        val current = _bookings.value
-        val found = current.find { it.id == bookingId }
-        if (found != null) {
-            _bookings.value = current.map {
-                if (it.id == bookingId) it.copy(status = "Cancelled") else it
-            }
-            addTransaction("Cancelled Call - ${found.modelName}", "Booking Cancelled", false)
-        }
-    }
 
     fun deductTokens(amount: Int, isVideo: Boolean = false, reason: String? = null): Boolean {
         val wallet = _walletState.value
@@ -562,7 +429,7 @@ class MainViewModel : ViewModel() {
                     videoBalance = newVideo,
                     balance = wallet.audioBalance + newVideo
                 )
-                addTransaction(txTitle, "-$amount Video Tokens", false)
+                addTransaction(txTitle, "-$amount Video Rupees", false)
                 return true
             }
         } else {
@@ -573,7 +440,7 @@ class MainViewModel : ViewModel() {
                     audioBalance = newAudio,
                     balance = newAudio + wallet.videoBalance
                 )
-                addTransaction(txTitle, "-$amount Audio Tokens", false)
+                addTransaction(txTitle, "-$amount Audio Rupees", false)
                 return true
             }
         }
@@ -588,14 +455,14 @@ class MainViewModel : ViewModel() {
                 videoBalance = newVideo,
                 balance = wallet.audioBalance + newVideo
             )
-            addTransaction("Video Token Pack Recharge", "+$amount Video Tokens", true)
+            addTransaction("Video Rupee Pack Recharge", "+$amount Video Rupees", true)
         } else {
             val newAudio = wallet.audioBalance + amount
             _walletState.value = wallet.copy(
                 audioBalance = newAudio,
                 balance = newAudio + wallet.videoBalance
             )
-            addTransaction("Audio Token Pack Recharge", "+$amount Audio Tokens", true)
+            addTransaction("Audio Rupee Pack Recharge", "+$amount Audio Rupees", true)
         }
     }
 
@@ -680,7 +547,7 @@ class MainViewModel : ViewModel() {
             // Add transaction log
             addTransaction(
                 title = "Referral Reward: @$username Signed Up",
-                amountText = "+100 Tokens (+50 A / +50 V)",
+                amountText = "+100 Rupees (+50 A / +50 V)",
                 isPositive = true
             )
             return true
@@ -724,7 +591,7 @@ class MainViewModel : ViewModel() {
         // Add transaction log
         addTransaction(
             title = "Promo Code Redeemed: $trimmedCode",
-            amountText = "+100 Tokens (+50 A / +50 V)",
+            amountText = "+100 Rupees (+50 A / +50 V)",
             isPositive = true
         )
         return true
@@ -752,6 +619,90 @@ class MainViewModel : ViewModel() {
         )
     )
     val userNames: StateFlow<Map<String, String>> = _userNames.asStateFlow()
+
+    private val _userUsernames = MutableStateFlow<Map<String, String>>(
+        mapOf(
+            "ajay@appinop.com" to "ajay_kumar",
+            "john_doe_99" to "john_doe",
+            "vip_ajay_999" to "vip_ajay",
+            "9876543210@dummy.phone" to "ajay_kumar",
+            "model_female@pairr.live" to "model_female",
+            "rahul_sharma" to "rahul_sharma",
+            "vikram_singh" to "vikram_singh",
+            "ananya_k" to "ananya_k",
+            "ramesh_k" to "ramesh_k",
+            "amit_p" to "amit_p",
+            "sagar_k" to "sagar_k",
+            "karan_w" to "karan_w"
+        )
+    )
+    val userUsernames: StateFlow<Map<String, String>> = _userUsernames.asStateFlow()
+
+    fun getUserPublicUsername(userId: String): String {
+        val canonical = resolveUserIdKey(userId) ?: userId
+        return _userUsernames.value.entries
+            .firstOrNull { userIdsMatch(it.key, canonical) }
+            ?.value
+            ?.takeIf { it.isNotBlank() }
+            ?: canonical.substringBefore("@")
+                .replace(Regex("[^a-zA-Z0-9]+"), "_")
+                .trim('_')
+                .lowercase()
+                .ifBlank { "user" }
+    }
+
+    fun getUserFullName(userId: String): String {
+        val canonical = resolveUserIdKey(userId) ?: userId
+        return _userNames.value.entries
+            .firstOrNull { userIdsMatch(it.key, canonical) }
+            ?.value
+            ?.takeIf { it.isNotBlank() }
+            ?: canonical.substringBefore("@").replace("_", " ")
+                .split(" ").joinToString(" ") { word ->
+                    word.replaceFirstChar { c -> c.uppercase() }
+                }
+    }
+
+    fun updateUserProfileIdentity(fullName: String, username: String) {
+        val userId = _currentUserId.value ?: return
+        val trimmedName = fullName.trim()
+        val trimmedUsername = username.trim().lowercase().replace(Regex("\\s+"), "_")
+        if (trimmedName.isBlank() || trimmedUsername.isBlank()) return
+
+        _userNames.update { map ->
+            map.toMutableMap().apply { put(userId, trimmedName) }
+        }
+        _userUsernames.update { map ->
+            map.toMutableMap().apply { put(userId, trimmedUsername) }
+        }
+        syncChatThreadsPublicUsername(userId, trimmedUsername)
+    }
+
+    private fun syncChatThreadsPublicUsername(userId: String, publicUsername: String) {
+        _chatThreads.update { threads ->
+            threads.map { thread ->
+                if (userIdsMatch(thread.userId, userId)) {
+                    thread.copy(userName = publicUsername)
+                } else {
+                    thread
+                }
+            }
+        }
+    }
+
+    private fun resolveUserIdKey(userId: String): String? {
+        _userNames.value.keys.firstOrNull { userIdsMatch(it, userId) }?.let { return it }
+        _userUsernames.value.keys.firstOrNull { userIdsMatch(it, userId) }?.let { return it }
+        return null
+    }
+
+    private fun defaultUsernameFor(name: String, phoneClean: String, accountKey: String): String {
+        val fromName = name.trim().lowercase().replace(Regex("[^a-z0-9]+"), "_").trim('_')
+        if (fromName.isNotBlank()) return fromName
+        val digits = phoneClean.filter { it.isDigit() }
+        if (digits.length >= 4) return "user_${digits.takeLast(4)}"
+        return accountKey.substringBefore("@").lowercase().ifBlank { "pairr_user" }
+    }
 
     private val _userModes = MutableStateFlow<Map<String, Boolean>>(
         mapOf(
@@ -790,6 +741,10 @@ class MainViewModel : ViewModel() {
             names[normalized] = name.trim()
             _userNames.value = names
 
+            val usernames = _userUsernames.value.toMutableMap()
+            usernames[normalized] = defaultUsernameFor(name, phoneClean, normalized)
+            _userUsernames.value = usernames
+
             val modes = _userModes.value.toMutableMap()
             modes[normalized] = isModel
             _userModes.value = modes
@@ -817,6 +772,73 @@ class MainViewModel : ViewModel() {
         } else {
             performLocalRegistration()
         }
+    }
+
+    fun loginWithPhoneOtp(
+        phone: String,
+        onResult: (Boolean, String?) -> Unit = { _, _ -> }
+    ) {
+        val phoneClean = phone.trim()
+        if (phoneClean.isBlank()) {
+            onResult(false, "Phone number is required")
+            return
+        }
+        val normalized = if (phoneClean.contains("@")) phoneClean else "$phoneClean@dummy.phone"
+        val existingKey = resolveAccountKey(phoneClean, normalized)
+
+        if (existingKey != null) {
+            val isModel = _userModes.value[existingKey] == true
+            _isModelMode.value = isModel
+            onAuthSuccess(existingKey, isModel)
+            onResult(true, null)
+            return
+        }
+
+        val displayName = phoneClean.takeLast(4).let { suffix ->
+            if (suffix.length == 4) "User $suffix" else "Pairr User"
+        }
+        registerUser(
+            name = displayName,
+            phone = phoneClean,
+            passwordEntered = "otp_auth",
+            isModel = false,
+            onResult = onResult
+        )
+    }
+
+    fun registerModel(
+        name: String,
+        phone: String,
+        gender: String,
+        age: String,
+        audioRate: String,
+        videoRate: String,
+        onResult: (Boolean, String?) -> Unit = { _, _ -> }
+    ) {
+        val phoneClean = phone.trim()
+        val normalized = if (phoneClean.contains("@")) phoneClean else "$phoneClean@dummy.phone"
+        if (resolveAccountKey(phoneClean, normalized) != null) {
+            onResult(false, "This phone number is already registered. Please log in instead.")
+            return
+        }
+        registerUser(
+            name = name,
+            phone = phoneClean,
+            passwordEntered = "otp_auth",
+            isModel = true,
+            gender = gender,
+            age = age,
+            audioRate = audioRate,
+            videoRate = videoRate,
+            onResult = onResult
+        )
+    }
+
+    fun quickLogin() {
+        val defaultUserId = "john_doe_99"
+        val isModel = _userModes.value[defaultUserId] == true
+        _isModelMode.value = isModel
+        onAuthSuccess(defaultUserId, isModel)
     }
 
     fun loginUser(phone: String, passwordEntered: String, onResult: (Boolean, String?) -> Unit = { _, _ -> }) {
@@ -898,77 +920,23 @@ class MainViewModel : ViewModel() {
         _walletState.value = Wallet(balance = 1500, audioBalance = 750, videoBalance = 750)
         _favorites.value = emptySet()
         _blockedUsers.value = emptyList()
-        _bookings.value = listOf(
-            CallBooking(
-                id = "b1",
-                modelId = "1",
-                modelName = "alessia_beauty",
-                modelAvatarUrl = "https://api.dicebear.com/7.x/bottts/png?seed=1",
-                isVideo = true,
-                date = "Tomorrow, Jun 12",
-                timeSlot = "04:30 PM - 05:00 PM",
-                cost = 250,
-                userId = "rahul_sharma",
-                userName = "Rahul Sharma",
-                userAvatarUrl = "https://i.pravatar.cc/300?u=rahul_sharma"
-            ),
-            CallBooking(
-                id = "b3",
-                modelId = "1",
-                modelName = "alessia_beauty",
-                modelAvatarUrl = "https://api.dicebear.com/7.x/bottts/png?seed=1",
-                isVideo = false,
-                date = "Sat, Jun 13",
-                timeSlot = "11:30 AM - 12:00 PM",
-                cost = 180,
-                userId = "vikram_singh",
-                userName = "Vikram Singh",
-                userAvatarUrl = "https://i.pravatar.cc/300?u=vikram_singh"
-            ),
-            CallBooking(
-                id = "b4",
-                modelId = "1",
-                modelName = "alessia_beauty",
-                modelAvatarUrl = "https://api.dicebear.com/7.x/bottts/png?seed=1",
-                isVideo = true,
-                date = "Sun, Jun 14",
-                timeSlot = "02:00 PM - 02:30 PM",
-                cost = 300,
-                userId = "ananya_k",
-                userName = "Ananya K.",
-                userAvatarUrl = "https://i.pravatar.cc/300?u=ananya_k"
-            ),
-            CallBooking(
-                id = "b2",
-                modelId = "3",
-                modelName = "riya_patel",
-                modelAvatarUrl = "https://api.dicebear.com/7.x/bottts/png?seed=3",
-                isVideo = false,
-                date = "Jun 14, 2026",
-                timeSlot = "11:00 AM - 11:30 AM",
-                cost = 150,
-                userId = "ajay@appinop.com",
-                userName = "Ajay Kumar",
-                userAvatarUrl = "https://i.pravatar.cc/300?u=ajay@appinop.com"
-            )
-        )
         _transactions.value = listOf(
-            WalletTransaction("tx1", "Gold Plan Activation", "+1250 Tokens", "10 Jun 2026, 09:30 AM", true),
-            WalletTransaction("tx2", "Private Video Call - Aisha Khan", "-300 Video Tokens", "10 Jun 2026, 10:15 AM", false),
-            WalletTransaction("tx3", "Private Audio Call - Riya Patel", "-250 Audio Tokens", "09 Jun 2026, 08:35 PM", false),
-            WalletTransaction("tx4", "Welcome Bonus", "+250 Tokens", "08 Jun 2026, 03:00 PM", true)
+            WalletTransaction("tx1", "Gold Plan Activation", "+1250 Rupees", "10 Jun 2026, 09:30 AM", true),
+            WalletTransaction("tx2", "Private Video Call - Aisha Khan", "-300 Video Rupees", "10 Jun 2026, 10:15 AM", false),
+            WalletTransaction("tx3", "Private Audio Call - Riya Patel", "-250 Audio Rupees", "09 Jun 2026, 08:35 PM", false),
+            WalletTransaction("tx4", "Welcome Bonus", "+250 Rupees", "08 Jun 2026, 03:00 PM", true)
         )
         _referredUsers.value = listOf("emily_clark", "luke_sky12")
         _hasRedeemedPromoCode.value = false
         _chatThreads.value = createInitialChatThreads()
         _chatMessages.value = createInitialChatMessages()
         _modelEarnings.value = listOf(
-            ModelCallEarning("e1", "1", "Rahul S.", true, "15:00", "10 Jun 2026, 10:15 AM", 300),
-            ModelCallEarning("e2", "1", "Amit P.", false, "12:30", "09 Jun 2026, 08:35 PM", 250),
-            ModelCallEarning("e3", "1", "Vikram D.", true, "08:45", "08 Jun 2026, 06:20 PM", 180),
-            ModelCallEarning("e4", "1", "Karan W.", false, "20:00", "07 Jun 2026, 11:00 AM", 400),
-            ModelCallEarning("e5", "3", "Sagar K.", true, "25:00", "08 Jun 2026, 09:10 PM", 360),
-            ModelCallEarning("e6", "3", "Neha R.", false, "10:00", "06 Jun 2026, 04:45 PM", 200)
+            ModelCallEarning("e1", "1", "rahul_sharma", true, "15:00", "10 Jun 2026, 10:15 AM", 300),
+            ModelCallEarning("e2", "1", "amit_p", false, "12:30", "09 Jun 2026, 08:35 PM", 250),
+            ModelCallEarning("e3", "1", "vikram_singh", true, "08:45", "08 Jun 2026, 06:20 PM", 180),
+            ModelCallEarning("e4", "1", "karan_w", false, "20:00", "07 Jun 2026, 11:00 AM", 400),
+            ModelCallEarning("e5", "3", "sagar_k", true, "25:00", "08 Jun 2026, 09:10 PM", 360),
+            ModelCallEarning("e6", "3", "ananya_k", false, "10:00", "06 Jun 2026, 04:45 PM", 200)
         )
     }
 
@@ -982,6 +950,7 @@ class MainViewModel : ViewModel() {
         _currentUserId.value = null
         _linkedModelId.value = null
         _isModelMode.value = false
+        _pendingNotificationPermissionPrompt.value = false
         firebaseAuth?.signOut()
     }
 
@@ -1019,10 +988,19 @@ class MainViewModel : ViewModel() {
         chatRepository.stopMessagesListener()
     }
 
+    private val _pendingNotificationPermissionPrompt = MutableStateFlow(false)
+    val pendingNotificationPermissionPrompt: StateFlow<Boolean> =
+        _pendingNotificationPermissionPrompt.asStateFlow()
+
+    fun dismissNotificationPermissionPrompt() {
+        _pendingNotificationPermissionPrompt.value = false
+    }
+
     private fun onAuthSuccess(userId: String, isModel: Boolean) {
         _currentUserId.value = userId
         _linkedModelId.value = if (isModel) userModelLinks[userId] ?: "1" else null
         startChatSync()
+        _pendingNotificationPermissionPrompt.value = true
     }
 
     private fun mergeThreadsFromRemote(remoteThreads: List<ChatThread>) {
@@ -1116,7 +1094,7 @@ class MainViewModel : ViewModel() {
         isOnline: Boolean = false
     ): String {
         val userId = _currentUserId.value ?: return modelId
-        val userName = _userNames.value[userId] ?: "User"
+        val userName = getUserPublicUsername(userId)
         val userAvatarUrl = "https://i.pravatar.cc/150?u=$userId"
         val threadId = chatRepository.buildThreadId(userId, modelId)
 
@@ -1258,7 +1236,7 @@ class MainViewModel : ViewModel() {
         val thread = ChatThread(
             id = threadId,
             participantName = model?.name ?: "Model",
-            participantAvatarUrl = model?.displayImageUrls()?.firstOrNull() ?: "https://i.pravatar.cc/150?u=$modelId",
+            participantAvatarUrl = model?.displayProfilePhotoUrl() ?: "https://i.pravatar.cc/150?u=$modelId",
             lastMessage = "Start a conversation…",
             lastMessageTime = "",
             unreadCount = 0,
@@ -1266,10 +1244,10 @@ class MainViewModel : ViewModel() {
             isModelThread = true,
             userId = userId,
             modelId = modelId,
-            userName = _userNames.value[userId] ?: "User",
-            modelName = model?.name ?: "Model",
+            userName = getUserPublicUsername(userId),
+            modelName = model?.publicUsername() ?: "Model",
             userAvatarUrl = "https://i.pravatar.cc/150?u=$userId",
-            modelAvatarUrl = model?.displayImageUrls()?.firstOrNull() ?: "https://i.pravatar.cc/150?u=$modelId"
+            modelAvatarUrl = model?.displayProfilePhotoUrl() ?: "https://i.pravatar.cc/150?u=$modelId"
         )
         _chatThreads.value = listOf(thread) + _chatThreads.value
         if (!_chatMessages.value.containsKey(threadId)) {
@@ -1299,7 +1277,7 @@ class MainViewModel : ViewModel() {
                 isModelThread = true,
                 userId = "john_doe_99",
                 modelId = "1",
-                userName = "John Doe",
+                userName = "john_doe",
                 modelName = "Aisha Khan",
                 userAvatarUrl = "https://i.pravatar.cc/150?u=john",
                 modelAvatarUrl = "https://i.pravatar.cc/150?u=1",
@@ -1318,7 +1296,7 @@ class MainViewModel : ViewModel() {
                 isModelThread = true,
                 userId = "john_doe_99",
                 modelId = "3",
-                userName = "John Doe",
+                userName = "john_doe",
                 modelName = "Riya Patel",
                 userAvatarUrl = "https://i.pravatar.cc/150?u=john",
                 modelAvatarUrl = "https://i.pravatar.cc/150?u=3",
@@ -1336,7 +1314,7 @@ class MainViewModel : ViewModel() {
                 isModelThread = true,
                 userId = "ajay@appinop.com",
                 modelId = "1",
-                userName = "Ajay Kumar",
+                userName = "ajay_kumar",
                 modelName = "Aisha Khan",
                 userAvatarUrl = "https://i.pravatar.cc/150?u=ajay",
                 modelAvatarUrl = "https://i.pravatar.cc/150?u=1",
@@ -1354,7 +1332,7 @@ class MainViewModel : ViewModel() {
                 isModelThread = true,
                 userId = "9876543210@dummy.phone",
                 modelId = "4",
-                userName = "Ajay Kumar",
+                userName = "ajay_kumar",
                 modelName = "Neha Singh",
                 userAvatarUrl = "https://i.pravatar.cc/150?u=ajay",
                 modelAvatarUrl = "https://i.pravatar.cc/150?u=4",
@@ -1419,63 +1397,12 @@ class MainViewModel : ViewModel() {
         _models.value.find { it.id == modelId }?.let { saveModelProfile(it) }
     }
 
-    fun addGalleryPhotoToCurrentModel(uri: String): Boolean {
-        val modelId = _linkedModelId.value ?: return false
-        var added = false
-        _models.update { list ->
-            list.map { model ->
-                if (model.id != modelId) return@map model
-                if (model.imageUrls.size >= 5) {
-                    added = false
-                    model
-                } else {
-                    added = true
-                    val newUrls = model.imageUrls + uri
-                    model.copy(
-                        imageUrls = newUrls,
-                        profilePhotoUrl = model.profilePhotoUrl?.takeIf { it.isNotBlank() } ?: uri
-                    )
-                }
-            }
-        }
-        if (added) {
-            _models.value.find { it.id == modelId }?.let { saveModelProfile(it) }
-        }
-        return added
-    }
-
-    fun removeGalleryPhotoFromCurrentModel(index: Int) {
-        updateCurrentModel { model ->
-            if (index !in model.imageUrls.indices) return@updateCurrentModel model
-            val removedUrl = model.imageUrls[index]
-            val newUrls = model.imageUrls.filterIndexed { i, _ -> i != index }
-            val newProfilePhoto = when {
-                model.profilePhotoUrl == removedUrl -> newUrls.firstOrNull()
-                else -> model.profilePhotoUrl
-            }
-            model.copy(imageUrls = newUrls, profilePhotoUrl = newProfilePhoto)
-        }
-    }
-
-    fun setIntroVideoForCurrentModel(uri: String) {
-        updateCurrentModel { it.copy(introVideoUrl = uri) }
-    }
-
-    fun clearIntroVideoForCurrentModel() {
-        updateCurrentModel { it.copy(introVideoUrl = null) }
-    }
-
     fun setProfilePhotoForCurrentModel(uri: String) {
-        updateCurrentModel { model ->
-            val urls = model.imageUrls.toMutableList()
-            if (urls.isEmpty()) {
-                model.copy(profilePhotoUrl = uri, imageUrls = listOf(uri))
-            } else {
-                urls.remove(uri)
-                urls.add(0, uri)
-                model.copy(profilePhotoUrl = uri, imageUrls = urls.take(5))
-            }
-        }
+        updateCurrentModel { it.copy(profilePhotoUrl = uri, introVideoUrl = null, imageUrls = emptyList()) }
+    }
+
+    fun clearProfilePhotoForCurrentModel() {
+        updateCurrentModel { it.copy(profilePhotoUrl = null, introVideoUrl = null, imageUrls = emptyList()) }
     }
 
     fun getModelProfile(modelId: String, onModel: (com.example.data.AppModel?) -> Unit) {
@@ -1622,6 +1549,9 @@ class MainViewModel : ViewModel() {
         "Amit P." to "amit_p",
         "Sagar K." to "sagar_k",
         "Karan W." to "karan_w",
+        "john_doe" to "john_doe_99",
+        "ajay_kumar" to "ajay@appinop.com",
+        "ramesh_k" to "ramesh_k",
         "John Doe" to "john_doe_99",
         "Ajay Kumar" to "ajay@appinop.com"
     )
@@ -1634,6 +1564,11 @@ class MainViewModel : ViewModel() {
         demoUserIdsByDisplayName.entries
             .firstOrNull { it.key.equals(trimmed, ignoreCase = true) }
             ?.value
+            ?.let { return it }
+
+        _userUsernames.value.entries
+            .firstOrNull { it.value.equals(trimmed, ignoreCase = true) }
+            ?.key
             ?.let { return it }
 
         _chatThreads.value
@@ -1666,13 +1601,8 @@ class MainViewModel : ViewModel() {
     fun getUserProfile(userId: String): UserProfile {
         val thread = _chatThreads.value.find { userIdsMatch(it.userId, userId) }
         val canonicalId = thread?.userId?.takeIf { it.isNotBlank() } ?: userId
-        val name = thread?.userName?.takeIf { it.isNotBlank() }
-            ?: _userNames.value.entries.find { userIdsMatch(it.key, userId) }?.value
-            ?: demoUserDisplayNames.entries.find { userIdsMatch(it.key, userId) }?.value
-            ?: canonicalId.substringBefore("@").replace("_", " ")
-                .split(" ").joinToString(" ") { word ->
-                    word.replaceFirstChar { c -> c.uppercase() }
-                }
+        val fullName = getUserFullName(canonicalId)
+        val username = getUserPublicUsername(canonicalId)
         val avatarUrl = thread?.userAvatarUrl?.takeIf { it.isNotBlank() }
             ?: "https://i.pravatar.cc/300?u=$canonicalId"
         val details = userProfileDetailsByKey.entries
@@ -1689,7 +1619,8 @@ class MainViewModel : ViewModel() {
 
         return UserProfile(
             id = canonicalId,
-            name = name,
+            name = fullName,
+            username = username,
             avatarUrl = avatarUrl,
             bio = details.bio,
             age = details.age,

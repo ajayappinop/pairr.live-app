@@ -106,7 +106,7 @@ fun ModelCallEarningsScreen(
                             )
                             Spacer(modifier = Modifier.height(6.dp))
                             Text(
-                                "$totalEarned Tokens",
+                                "$totalEarned Rupees",
                                 color = androidx.compose.ui.graphics.Color.White,
                                 fontSize = 32.sp,
                                 fontWeight = FontWeight.Black
@@ -301,7 +301,7 @@ private fun CallEarningListItem(
                 fontWeight = FontWeight.Bold,
                 fontSize = 16.sp
             )
-            Text("Tokens", color = appMutedText(), fontSize = 10.sp)
+            Text("Rupees", color = appMutedText(), fontSize = 10.sp)
         }
     }
 }

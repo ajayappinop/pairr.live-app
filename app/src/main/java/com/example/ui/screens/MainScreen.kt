@@ -1,5 +1,12 @@
 package com.example.ui.screens
 
+import android.Manifest
+import android.content.Context
+import android.content.pm.PackageManager
+import android.os.Build
+import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -25,16 +32,22 @@ import androidx.compose.ui.draw.scale
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.draw.scale
+import androidx.core.content.ContextCompat
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.example.MainViewModel
+import com.example.ui.components.EnableNotificationsDialog
 import com.example.ui.theme.PinkPrimary
 import com.example.ui.theme.LightOnSurface
 import com.example.ui.theme.bottomBarBrush
@@ -44,22 +57,90 @@ import com.example.ui.theme.isAppDarkTheme
 fun MainScreen(
     viewModel: MainViewModel,
     onModelClick: (String) -> Unit,
+    onCall: (String, Boolean) -> Unit = { _, _ -> },
     onViewMoreTransactions: () -> Unit,
     onViewPackages: (String) -> Unit,
-    onViewAll: () -> Unit,
     onLogout: () -> Unit,
     onUserClick: (String) -> Unit = {},
-    onRandomPeerCall: (String) -> Unit = {},
     onViewAllCallEarnings: () -> Unit = {}
 ) {
+    val context = LocalContext.current
+    val lifecycleOwner = LocalLifecycleOwner.current
+    val pendingNotificationPrompt by viewModel.pendingNotificationPermissionPrompt.collectAsStateWithLifecycle()
+    val currentUserId by viewModel.currentUserId.collectAsStateWithLifecycle()
+    var showNotificationDialog by remember(currentUserId) { mutableStateOf(false) }
+    var notificationsGranted by remember { mutableStateOf(hasNotificationPermission(context)) }
+
+    val notificationPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        notificationsGranted = granted || hasNotificationPermission(context)
+        showNotificationDialog = false
+        if (notificationsGranted) {
+            Toast.makeText(context, "Notifications enabled", Toast.LENGTH_SHORT).show()
+        } else {
+            Toast.makeText(
+                context,
+                "You can enable notifications anytime in Profile settings",
+                Toast.LENGTH_SHORT
+            ).show()
+        }
+    }
+
     val bottomNavController = rememberNavController()
     val navBackStackEntry by bottomNavController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route
     val isModelMode = viewModel.isModelMode.collectAsStateWithLifecycle().value
     val chatThreads by viewModel.chatThreads.collectAsStateWithLifecycle()
-    val currentUserId by viewModel.currentUserId.collectAsStateWithLifecycle()
     val unreadChatCount = remember(chatThreads, isModelMode, currentUserId) {
         viewModel.getUnreadCount(isModelMode)
+    }
+
+    LaunchedEffect(pendingNotificationPrompt, notificationsGranted) {
+        if (pendingNotificationPrompt && !notificationsGranted) {
+            showNotificationDialog = true
+            viewModel.dismissNotificationPermissionPrompt()
+        }
+    }
+
+    LaunchedEffect(currentUserId) {
+        notificationsGranted = hasNotificationPermission(context)
+        if (notificationsGranted) {
+            showNotificationDialog = false
+            viewModel.dismissNotificationPermissionPrompt()
+        }
+    }
+
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                val granted = hasNotificationPermission(context)
+                notificationsGranted = granted
+                if (granted) {
+                    showNotificationDialog = false
+                    viewModel.dismissNotificationPermissionPrompt()
+                }
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
+
+    if (showNotificationDialog && !notificationsGranted) {
+        EnableNotificationsDialog(
+            onEnable = {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                    notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                } else {
+                    notificationsGranted = true
+                    showNotificationDialog = false
+                    Toast.makeText(context, "Notifications enabled", Toast.LENGTH_SHORT).show()
+                }
+            },
+            onDismiss = {
+                showNotificationDialog = false
+            }
+        )
     }
 
     Scaffold(
@@ -92,9 +173,7 @@ fun MainScreen(
                     DashboardScreen(
                         viewModel = viewModel,
                         onModelClick = onModelClick,
-                        onViewAll = onViewAll,
-                        onViewPackages = onViewPackages,
-                        onRandomPeerCall = onRandomPeerCall
+                        onCall = onCall
                     )
                 }
             }
@@ -143,6 +222,17 @@ fun MainScreen(
                 }
             }
         }
+    }
+}
+
+private fun hasNotificationPermission(context: Context): Boolean {
+    return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+        ContextCompat.checkSelfPermission(
+            context,
+            Manifest.permission.POST_NOTIFICATIONS
+        ) == PackageManager.PERMISSION_GRANTED
+    } else {
+        true
     }
 }
 
